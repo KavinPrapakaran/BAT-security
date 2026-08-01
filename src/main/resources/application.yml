@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: cognesis
+  datasource:
+    url: jdbc:h2:mem:cognesis;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema-h2.sql
+
+server:
+  port: 8080
+
+cognesis:
+  algorithm:
+    band:
+      warn: 0.32
+      monitor: 0.55
+      block: 0.80
+    low-confidence-threshold: 0.25
+    escalate-when-uncertain: true
+  trust:
+    default-trust: 0.5
+    positive-gain: 0.15
+    negative-gain: 0.35
+    decay-rate: 0.005
+    observations-for-full-confidence: 60
+    trust-graph-influence: 0.30
+  memory:
+    activation-decay: 0.02
+    recall-limit: 20
+  dns:
+    weights:
+      evidence: 0.50
+      trust: 0.15
+      memory: 0.08
+      intent: 0.08
+      prediction: 0.05
+      deviation: 0.04
+    likelihood-weight: 0.70
+
+logging:
+  level:
+    com.cognesis: INFO
