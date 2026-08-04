@@ -16,6 +16,7 @@ public class CognesisProperties {
     private final Trust trust = new Trust();
     private final Memory memory = new Memory();
     private final Dns dns = new Dns();
+    private final Feed feed = new Feed();
 
     public static class Algorithm {
         private Band band = new Band();
@@ -195,6 +196,7 @@ public class CognesisProperties {
 
     public static class Dns {
         private Weights weights = new Weights();
+        private Live live = new Live();
 
         public Weights getWeights() {
             return weights;
@@ -204,9 +206,74 @@ public class CognesisProperties {
             this.weights = weights;
         }
 
+        public Live getLive() {
+            return live;
+        }
+
+        public void setLive(Live live) {
+            this.live = live;
+        }
+
         public SynapseWeights toSynapseWeights() {
             return new SynapseWeights(weights.getEvidence(), weights.getTrust(), weights.getMemory(),
                     weights.getIntent(), weights.getPrediction(), weights.getDeviation(), 0.70);
+        }
+
+        public static class Live {
+            private boolean enabled = true;
+            private String dohUrl = "https://cloudflare-dns.com/dns-query";
+            private String rdapUrl = "https://rdap.org/domain";
+            private String crtUrl = "https://crt.sh";
+            private int timeoutSeconds = 6;
+            private long cacheTtlSeconds = 300;
+
+            public boolean isEnabled() {
+                return enabled;
+            }
+
+            public void setEnabled(boolean enabled) {
+                this.enabled = enabled;
+            }
+
+            public String getDohUrl() {
+                return dohUrl;
+            }
+
+            public void setDohUrl(String dohUrl) {
+                this.dohUrl = dohUrl;
+            }
+
+            public String getRdapUrl() {
+                return rdapUrl;
+            }
+
+            public void setRdapUrl(String rdapUrl) {
+                this.rdapUrl = rdapUrl;
+            }
+
+            public String getCrtUrl() {
+                return crtUrl;
+            }
+
+            public void setCrtUrl(String crtUrl) {
+                this.crtUrl = crtUrl;
+            }
+
+            public int getTimeoutSeconds() {
+                return timeoutSeconds;
+            }
+
+            public void setTimeoutSeconds(int timeoutSeconds) {
+                this.timeoutSeconds = timeoutSeconds;
+            }
+
+            public long getCacheTtlSeconds() {
+                return cacheTtlSeconds;
+            }
+
+            public void setCacheTtlSeconds(long cacheTtlSeconds) {
+                this.cacheTtlSeconds = cacheTtlSeconds;
+            }
         }
 
         public static class Weights {
@@ -267,6 +334,36 @@ public class CognesisProperties {
         }
     }
 
+    public static class Feed {
+        private String url = "";
+        private int timeoutSeconds = 10;
+        private boolean enabled = false;
+
+        public String getUrl() {
+            return url;
+        }
+
+        public void setUrl(String url) {
+            this.url = url;
+        }
+
+        public int getTimeoutSeconds() {
+            return timeoutSeconds;
+        }
+
+        public void setTimeoutSeconds(int timeoutSeconds) {
+            this.timeoutSeconds = timeoutSeconds;
+        }
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+    }
+
     public Algorithm getAlgorithm() {
         return algorithm;
     }
@@ -281,5 +378,9 @@ public class CognesisProperties {
 
     public Dns getDns() {
         return dns;
+    }
+
+    public Feed getFeed() {
+        return feed;
     }
 }

@@ -8,3 +8,9 @@ spring:
 cognesis:
   security:
     api-keys: cognesis-test-key-1,cognesis-test-key-2
+  feed:
+    enabled: false
+    url: ""
+  dns:
+    live:
+      enabled: false

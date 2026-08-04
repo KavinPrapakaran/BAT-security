@@ -65,13 +65,38 @@ Persistence & Observability ✅ · v1.0.0 Stable ✅.
 - Stateless, no sessions. Configurable keys via `cognesis.security.api-keys`.
 - **62 tests green**, incl. 8 security tests (auth filter, open/closed endpoints).
 
-## 4. Later (framework growth)
+## 4. Done (v1.1.0 — Detection export & live threat intel)
+
+- **Detection export**: `POST /api/v1/detections/dns` evaluates a domain and
+  returns SIEM-ready artifacts — a **Sigma** rule (dns_query logsource, level
+  mapped from the decision band) and a **YARA** rule embedding the domain and
+  the reasoning-chain claims. Bridges COGNESIS verdicts to real detection
+  tooling.
+- **Live threat-intel ingestion**: `ThreatFeedIngestor` fetches a host-file
+  style feed (abuse.ch ThreatFox/URLhaus format), flags IOCs in the DNS facts
+  repository, and `POST /api/v1/feeds/refresh` triggers a refresh on demand.
+  Opt-in via `cognesis.feed.enabled` + `cognesis.feed.url`; offline/unreachable
+  feeds never fail startup or throw (guarded + time-boxed).
+- Flagged domains flow into ACDE verdicts through `DnsEvidenceProvider`
+  (`maliciousFlagCount` → `THREAT_INTEL`-style evidence).
+- **Live facts, not fixtures**: `LiveDnsFactsRepository` queries real
+  DNS-over-HTTPS (Cloudflare), RDAP/WHOIS (rdap.org) and certificate
+  transparency (crt.sh) per domain — DNSSEC validity, registration age,
+  registrar, subdomain/cert counts — with per-source timeouts, a TTL cache,
+  and wholesale fallback to the in-memory seed when offline.
+- **ThreatIntel analyzer (16th)**: feed flags now enter the reasoning chain as
+  `CODE:THREAT_INTEL`; a single match exceeds the MOTIVE enrichment threshold.
+- **DevOps**: GitHub Actions CI (Java 21, full suite + jar), multi-stage
+  Dockerfile + `docker-compose.yml` (live feed + live DNS on by default).
+- **78 tests green**, incl. 7 new tests (mock-HTTP live facts, fallback &
+  cache behaviour, feed-IOC escalation through the ACDE).
+
+## 5. Later (framework growth)
 
 ### New evidence providers (drop-in, no core changes)
 - Email gateway (SPF/DKIM/DMARC verdicts → `EMAIL_REPUTATION`).
 - EDR/endpoint (process/network telemetry → `ENDPOINT_TELEMETRY`).
 - Cloud CSPM (misconfig findings → `CLOUD_FINDING`).
-- Threat-intel feeds (IOC matches → `THREAT_INTEL`).
 
 ### New domain engines (drop-in, no core changes)
 - **CORTEX — Identity engine**: evaluates accounts/IPs/sessions; consumes

@@ -11,8 +11,11 @@ Implemented in `dns/*`:
 
 - `CognitiveDnsEngineImpl` — the ACDE-facing engine: it collects DNS evidence
   fragments and asks the **ACDE** (`acde/AcdeEngine`) to decide.
-- `DnsSignalAnalyzer` (interface) + **15 analyzers** in `dns/analyzer/`.
-- `DnsFacts` / `DnsFactsRepository` (in-memory facts store) and `DnsSignal`.
+- `DnsSignalAnalyzer` (interface) + **16 analyzers** in `dns/analyzer/`.
+- `DnsFacts` / `DnsFactsRepository` and `DnsSignal`.
+- `LiveDnsFactsRepository` — real-world facts from DNS-over-HTTPS (DoH),
+  RDAP/WHOIS and certificate-transparency (crt.sh), cached + time-boxed,
+  falling back to the in-memory seed data when offline.
 - `DnsDecision` — the verdict, reusing the framework `DecisionResult` shape.
 
 ---
@@ -37,7 +40,7 @@ For each resolution request `(domain, clientId, clientIp)`:
 12  persist             ← decision_log, trust events (see docs/07-database.md)
 ```
 
-## 2. The 15 analyzers
+## 2. The 16 analyzers
 
 Each analyzer returns a `DnsSignal(evidenceType, strength, confidence,
 explanation, provenance)`.
@@ -59,6 +62,21 @@ explanation, provenance)`.
 | 13 | PolicyAnalyzer | `DNS_POLICY` | matches deny-list / policy rules | policy match |
 | 14 | UserBehaviour | `DNS_USER_BEHAV` | does this user usually query this? | baseline deviation |
 | 15 | NetworkBehaviour | `DNS_NET_BEHAV` | does this network usually resolve this? | baseline deviation |
+| 16 | ThreatIntel | `THREAT_INTEL` | matches an IOC in the threat-intel feed | feed flag count |
+
+### 2.3 Threat-intel feed (analyzer 16)
+
+`ThreatFeedIngestor` fetches a host-file style feed (abuse.ch URLhaus by default)
+and flags every matching domain in the facts repository. `ThreatIntelAnalyzer`
+turns those flags into a signal:
+
+```
+if maliciousFlagCount > 0:  strength = min(1, 0.55 + count·0.2), conf 0.85
+else:                       strength 0.1, conf 0.9 (neutral)
+```
+
+A single flag already lands above the MOTIVE intent-enrichment threshold
+(`strength ≥ 0.4`), so known-bad domains escalate through the normal pipeline.
 
 ### 2.1 DGA scoring (DgaAnalyzer)
 
@@ -137,8 +155,24 @@ includes, in order:
 
 `DnsFacts` bundles everything the analyzers read (resolved addresses, TTL,
 registrar, registration date, DNSSEC status, certificate info, WHOIS fields,
-policy tags). `InMemoryDnsFactsRepository` serves a seedable in-memory view;
-a production deployment backs it with a facts store / threat-intel feed.
+policy tags).
+
+Two repositories implement `DnsFactsRepository`:
+
+- `InMemoryDnsFactsRepository` — deterministic seed data (tests, offline dev).
+- `LiveDnsFactsRepository` — the default in production. It queries three public
+  sources per domain, each guarded with try/catch and a connect/read timeout:
+  - **Cloudflare DoH** (`https://cloudflare-dns.com/dns-query`) — A records; the
+    `AD` (authentic data) flag becomes the `dnssecValid` fact.
+  - **RDAP/WHOIS** (`https://rdap.org/domain`) — registration date → `ageDays`,
+    `secureDNS.delegationSigned` → DNSSEC, registrar name.
+  - **crt.sh** (`https://crt.sh`) — certificate transparency SAN entries →
+    `subdomains`, `certificateCount`, `certificateIssuedAt`.
+
+  Results are cached for `cognesis.dns.live.cache-ttl-seconds`. If no source
+  responds the repository falls back wholesale to the in-memory sample facts,
+  so the engine never fails on transient network issues. Enable/disable via
+  `cognesis.dns.live.enabled` (off by default in tests, on in production).
 
 ## 7. REST interface
 

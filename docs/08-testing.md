@@ -6,8 +6,11 @@
 - **Spring context smoke test** (`CognesisApplicationTests`) boots the entire
   wiring against in-memory H2 and exercises the pipeline end-to-end.
 - **Mockito** isolates the ACDE from its engine dependencies.
-- **No network/IO**: all tests are local and fast; the build must be green
-  with `mvn test` (no services required).
+- **No real network/IO**: the live-source tests use `MockRestServiceServer`
+  against a fake base URL; the build is green with `mvn test` (no services
+  required, PostgreSQL integration excluded unless Docker is available).
+- **CI**: `.github/workflows/ci.yml` runs the full suite on Java 21 for every
+  push/PR (see §5).
 
 ## 2. Coverage map
 
@@ -23,8 +26,12 @@
 | `CognitiveDnsEngineTest` | CODE end-to-end via ACDE | 4 tests: well-known domain → ALLOW; typosquat riskier than brand; hard policy override → BLOCK with risk/conf 1.0; reasoning chain present |
 | `AcdeEngineTest` | ACDE full pipeline | 1 test (Mockito): all engines invoked, ≥ 10 reasoning steps, decision persisted, reasoning path stored in memory |
 | `CognesisApplicationTests` | Spring wiring + H2 | 3 tests: context loads; DNS decision persisted to DB; ACDE runs through pipeline |
+| `DetectionRuleGeneratorTest` | Sigma + YARA export | 4 tests: well-formed Sigma (dns_query, level per band); severity mapping; well-formed YARA (domain + claims, risk score); bundle filenames |
+| `ThreatFeedIngestorTest` | abuse.ch-style feed ingestion | 5 tests: host-file parsing flags IOCs; comments/blanks ignored; flags accumulate; disabled feed skips network; unreachable feed swallowed |
+| `LiveDnsFactsRepositoryTest` | live DNS/RDAP/CT facts via mock HTTP | 5 tests: assembles facts from all three sources; wholesale fallback when every source is offline; partial failure still uses responding sources; feed flags survive the live merge; results cached (no second network round-trip) |
+| `IocEscalationTest` | feed IOC → ACDE verdict | 2 tests: flagged domain strictly riskier + non-ALLOW; reasoning chain contains the `CODE:THREAT_INTEL` step |
 
-**Total: 40 tests, 0 failures.**
+**Total: 78 tests, 0 failures.**
 
 ## 3. Running
 
@@ -63,8 +70,15 @@ These encode the framework's key design decisions as regression guards:
 8. **`recordDecisionStoresDecisionNodeLinkedToEntity`** — every decision keeps
    its reasoning path in memory, so "why did we do X" is always answerable.
 
-## 5. CI suggestion
+## 5. CI
 
-A minimal pipeline: `git push` → `mvn -q package` → archive `target/*.jar`.
-No external services required; H2 covers DB integration until PostgreSQL is
-added in a later stage.
+`.github/workflows/ci.yml` runs on every push/PR to `main`/`master`:
+
+1. Checkout, then Java 21 (Temurin) with a Maven dependency cache.
+2. `mvn test` — the full suite (PostgreSQL integration test runs via
+   Testcontainers; Docker is available on the runner).
+3. `mvn package -DskipTests` — verifies the runnable jar builds.
+4. On failure, `target/surefire-reports/**` is uploaded as an artifact.
+
+Local equivalent: `mvn test`. H2 covers DB integration without a server;
+Docker is only needed for the PostgreSQL integration test.

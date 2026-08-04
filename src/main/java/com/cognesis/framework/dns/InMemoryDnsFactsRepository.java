@@ -59,6 +59,26 @@ public class InMemoryDnsFactsRepository implements DnsFactsRepository {
                 1, false, 0);
     }
 
+    /**
+     * Marks a domain as previously-flagged (IOC). Used by threat-intel feed
+     * ingestion so that live feeds (e.g. abuse.ch) influence future verdicts.
+     */
+    public void flagMalicious(String domain) {
+        String key = normalize(domain);
+        if (key.isEmpty()) {
+            return;
+        }
+        facts.compute(key, (k, existing) -> existing == null
+                ? new DnsFacts(key, UNKNOWN_DOMAIN.ageDays(), false, 1, 1, 0.6,
+                        List.of(), "enabled", Instant.now().minusSeconds(86400),
+                        1, false, 1)
+                : new DnsFacts(existing.domain(), existing.ageDays(), existing.dnssecValid(),
+                        existing.registrarCount(), existing.nameServerChanges(),
+                        existing.ipRecordChurn(), existing.subdomains(), existing.whoisPrivacy(),
+                        existing.certificateIssuedAt(), existing.certificateCount(),
+                        existing.certificateInCtLogs(), existing.maliciousFlagCount() + 1));
+    }
+
     private static String normalize(String domain) {
         return domain == null ? "" : domain.trim().toLowerCase(Locale.ROOT);
     }

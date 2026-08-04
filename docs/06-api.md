@@ -110,7 +110,42 @@ POST /api/v1/evidence/aggregate
 Applies the weighted-mean + dominant-signal aggregation described in
 `docs/01-architecture.md` §3.1.
 
-## 6. Enumerations (values used in the scaffold)
+## 6. `POST /api/v1/detections/dns`
+
+Evaluates a DNS request and exports the verdict as SIEM-ready detection
+artifacts (Sigma YAML + YARA). Body is the same `DnsResolutionRequest` as
+§1.
+
+```json
+[
+  { "format": "sigma", "content": "title: COGNESIS - BLOCK ...\n...",
+    "filename": "cognesis_7f3c....yml" },
+  { "format": "yara", "content": "rule cogensis_high_risk_block { ... }",
+    "filename": "cognesis_7f3c....yar" }
+]
+```
+
+- Sigma: `logsource.category: dns_query`, `query|cstartswith: <domain>`, and
+  the reasoning-chain claims embedded as `query|contains` terms. `level` maps
+  from the decision band: ALLOW→informational, MONITOR→low, WARN/CHALLENGE→
+  medium, ESCALATE→high, ISOLATE/BLOCK→critical.
+- YARA: `$a` matches the domain (`ascii wide nocase`), up to 8 reasoning-chain
+  claims as secondary strings, with `risk_score` and `decisionId` in meta.
+
+## 7. `POST /api/v1/feeds/refresh`
+
+Triggers a threat-intel feed refresh (abuse.ch ThreatFox/URLhaus host-file
+format). No body. Requires a configured feed (see config below); the ingestor
+is a no-op and returns `iocsIngested: 0` when disabled or unreachable.
+
+```json
+{ "status": "accepted", "iocsIngested": 42 }
+```
+
+Flagged domains (`maliciousFlagCount`) flow into ACDE verdicts via
+`DnsEvidenceProvider`.
+
+## 8. Enumerations (values used in the scaffold)
 
 | Concept | Values |
 |---|---|
@@ -119,20 +154,48 @@ Applies the weighted-mean + dominant-signal aggregation described in
 | `EvidenceType` | `DNS_AGE`, `DNS_REGISTRAR`, `DNS_DNSSEC`, `DNS_FAST_FLUX`, `DNS_DGA`, `DNS_HOMOGRAPH`, `DNS_TYPOSQUAT`, `DNS_SUBDOMAIN`, `DNS_CT`, `DNS_WHOIS`, `DNS_HIST_TRUST`, `DNS_THREAT_MEM`, `DNS_POLICY`, `DNS_USER_BEHAV`, `DNS_NET_BEHAV`, `NETWORK_REPUTATION`, `FILE_REPUTATION`, `AUTH_ANOMALY`, `EMAIL_REPUTATION`, `API_ABUSE`, ... |
 | `Provenance` | `DNS_RESPONSE`, `NETWORK_FLOW`, `ENDPOINT_TELEMETRY`, `AUTH_LOG`, `EMAIL_GATEWAY`, `THREAT_INTEL`, `API_GATEWAY`, ... |
 
-## 7. Config reference (`application.yml`, `cognesis.*`)
+## 9. Config reference (`application.yml`, `cognesis.*`)
 
 ```yaml
 cognesis:
-  synapse:
-    weights: { evidence: 0.50, trust: 0.15, memory: 0.08, intent: 0.08, prediction: 0.05, deviation: 0.04, impact: 0.70 }
-    bands: { monitor: 0.30, warn: 0.45, challenge: 0.58, escalate: 0.68, isolate: 0.82, block: 0.92, tolerance: 1.0, lowConfidenceThreshold: 0.25, escalateWhenUncertain: true }
+  security:
+    api-keys: cognesis-prod-key-1,cognesis-prod-key-2
+  feed:
+    enabled: true
+    url: "https://urlhaus.abuse.ch/downloads/hostfile/"
+    timeout-seconds: 10
+  dns:
+    live:
+      enabled: true
+      doh-url: "https://cloudflare-dns.com/dns-query"
+      rdap-url: "https://rdap.org/domain"
+      crt-url: "https://crt.sh"
+      timeout-seconds: 6
+      cache-ttl-seconds: 300
+    weights: { evidence: 0.50, trust: 0.15, memory: 0.08, intent: 0.08, prediction: 0.05, deviation: 0.04 }
   trust:
+    default-trust: 0.5
     positive-gain: 0.15
     negative-gain: 0.35
-    confidence-n0: 60
-    decay-half-life-hours: 24
+    decay-rate: 0.005
+    observations-for-full-confidence: 60
   memory:
-    propagation-factor: 0.4
-    max-hops: 2
-    decay-half-life-hours: 72
+    activation-decay: 0.02
+    recall-limit: 20
+  algorithm:
+    band: { monitor: 0.30, warn: 0.45, challenge: 0.58, escalate: 0.68, isolate: 0.82, block: 0.92 }
+    low-confidence-threshold: 0.25
+    escalate-when-uncertain: true
 ```
+
+`feed.enabled: true` fetches the URLhaus host-file once at startup and on
+`POST /api/v1/feeds/refresh`. Set `cognesis.dns.live.enabled: false` (or unset
+URLs) to use the in-memory seed facts; every live source is individually
+time-boxed and the engine falls back gracefully when offline.
+
+## 10. Security
+
+`/api/v1/**` and `/actuator/**` (except `/actuator/health`) require an API key:
+`Authorization: Bearer <key>` or `X-API-Key: <key>`. Keys configured via
+`cognesis.security.api-keys` (comma-separated). Unauthorised requests → 403.
+The new detection and feed endpoints follow the same rule.

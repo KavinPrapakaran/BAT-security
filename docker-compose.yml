@@ -1,0 +1,16 @@
+services:
+  cognesis:
+    build: .
+    image: cognesis-framework:latest
+    container_name: cognesis
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      COGNESIS_FEED_ENABLED: "true"
+      COGNESIS_FEED_URL: "https://urlhaus.abuse.ch/downloads/hostfile/"
+      COGNESIS_DNS_LIVE_ENABLED: "true"
+      COGNESIS_DNS_LIVE_DOH-URL: "https://cloudflare-dns.com/dns-query"
+      COGNESIS_DNS_LIVE_RDAP-URL: "https://rdap.org/domain"
+      COGNESIS_DNS_LIVE_CRT-URL: "https://crt.sh"
+    restart: unless-stopped

@@ -20,7 +20,8 @@ src/main/java/com/cognesis/framework/
   algorithm/         SYNAPSE decision engine + weights + bands
   math/              LogitOps (log-odds fusion, entropy, decisiveness)
   observatory/       evidence ingestion & aggregation (dominant-signal rule)
-  dns/               CODE: Cognitive DNS Engine + 15 analyzers
+  dns/               CODE: Cognitive DNS Engine + 16 analyzers + live facts
+                     (DoH, RDAP/WHOIS, crt.sh) with offline fallback
   trust/             FIDES: dynamic asymmetric trust engine
   memory/            MNEMONIC: episodic knowledge graph + spreading activation
   context/           CONTEXT: situational environment risk
@@ -35,10 +36,12 @@ src/main/java/com/cognesis/framework/
   metrics/           Micrometer counters and timers
   validation/        input validation annotations & validators
   security/          API key authentication filter
+  detection/         Sigma + YARA rule export for COGNESIS verdicts
+  feed/              live threat-intel feed ingestion (abuse.ch, configurable)
   config/            CognesisProperties + Spring wiring
   api/               REST controllers
 src/main/resources/  application.yml, db/schema-h2.sql, db/migration/
-src/test/java/       62 tests (unit + Spring context + H2 + validation + security)
+src/test/java/       78 tests (unit + Spring context + H2 + validation + security + detection + feed + live facts)
 ```
 
 ## Requirements
@@ -49,9 +52,10 @@ src/test/java/       62 tests (unit + Spring context + H2 + validation + securit
 ## Build & run
 
 ```bash
-mvn test          # 62 tests, all green
+mvn test          # 78 tests, all green
 mvn package       # runnable Spring Boot jar
 mvn spring-boot:run   # dev profile: in-memory H2, port 8080
+docker compose up --build   # containerised, live feed + live DNS on by default
 ```
 
 ## Quick start (REST)
@@ -76,13 +80,28 @@ curl -s http://localhost:8080/api/v1/decisions/evaluate \
 
 Full API reference: `docs/06-api.md`.
 
+Export a verdict as SIEM-ready detection content (Sigma + YARA):
+
+```bash
+curl -s http://localhost:8080/api/v1/detections/dns \
+  -H 'Content-Type: application/json' \
+  -d '{"domain":"paypa1.com","clientId":"alice","clientIp":"10.1.1.5"}'
+```
+
+Trigger a threat-intel feed refresh (abuse.ch / URLhaus host file; on by
+default via `cognesis.feed.*`, ingested once at startup and on demand):
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/feeds/refresh
+```
+
 ## The engines
 
 | Engine | Role | Docs |
 |---|---|---|
 | **ACDE** | Adaptive Cognitive Decision Engine — the single decision-maker | `docs/01-architecture.md` |
 | **SYNAPSE** | Fuses evidence slices into a calibrated risk + decision band | `docs/02-decision-algorithm.md` |
-| **CODE** | Cognitive DNS Engine — 15 analyzers, feeds the ACDE | `docs/03-dns-engine.md` |
+| **CODE** | Cognitive DNS Engine — 16 analyzers, feeds the ACDE | `docs/03-dns-engine.md` |
 | **MNEMONIC** | Episodic memory graph, spreading activation, baselines | `docs/04-memory-engine.md` |
 | **FIDES** | Asymmetric, decaying, explainable dynamic trust | `docs/05-trust-engine.md` |
 | Observatory / Context / Seer / Motive / Resolve / Pact / Lore | supporting evidence & decision engines | `docs/01-architecture.md` |
@@ -93,13 +112,14 @@ Full API reference: `docs/06-api.md`.
 docs/00-overview.md       concept, glossary, how to read the docs
 docs/01-architecture.md   modules, data flows, integration points
 docs/02-decision-algorithm.md  SYNAPSE math, bands, confidence, learning
-docs/03-dns-engine.md     CODE pipeline + the 15 analyzers
+docs/03-dns-engine.md     CODE pipeline + the 16 analyzers
 docs/04-memory-engine.md  MNEMONIC storage/retrieval/learning
 docs/05-trust-engine.md   FIDES formulas, decay, examples
 docs/06-api.md            REST contracts and example payloads
 docs/07-database.md       schemas, seed data, migration notes
 docs/08-testing.md        test strategy and coverage map
 docs/09-roadmap.md        done / next / later
+docs/10-demo.md           end-to-end demo: live sources, BLOCK verdict, SIEM export
 ```
 
 ## Ground rules

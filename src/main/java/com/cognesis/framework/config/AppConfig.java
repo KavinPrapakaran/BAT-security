@@ -10,6 +10,7 @@ import com.cognesis.framework.dns.CognitiveDnsEngineImpl;
 import com.cognesis.framework.dns.DnsFactsRepository;
 import com.cognesis.framework.dns.DnsSignalAnalyzer;
 import com.cognesis.framework.dns.InMemoryDnsFactsRepository;
+import com.cognesis.framework.dns.LiveDnsFactsRepository;
 import com.cognesis.framework.dns.analyzer.CertificateTransparencyAnalyzer;
 import com.cognesis.framework.dns.analyzer.DgaAnalyzer;
 import com.cognesis.framework.dns.analyzer.DnssecAnalyzer;
@@ -21,10 +22,12 @@ import com.cognesis.framework.dns.analyzer.NetworkBehaviourAnalyzer;
 import com.cognesis.framework.dns.analyzer.PolicyAnalyzer;
 import com.cognesis.framework.dns.analyzer.RegistrarHistoryAnalyzer;
 import com.cognesis.framework.dns.analyzer.SubdomainBehaviourAnalyzer;
+import com.cognesis.framework.dns.analyzer.ThreatIntelAnalyzer;
 import com.cognesis.framework.dns.analyzer.ThreatMemoryAnalyzer;
 import com.cognesis.framework.dns.analyzer.TyposquattingAnalyzer;
 import com.cognesis.framework.dns.analyzer.UserBehaviourAnalyzer;
 import com.cognesis.framework.dns.analyzer.WhoisAnalyzer;
+import com.cognesis.framework.feed.ThreatFeedIngestor;
 import com.cognesis.framework.impact.AssetRegistry;
 import com.cognesis.framework.impact.ImpactEngine;
 import com.cognesis.framework.impact.InMemoryAssetRegistry;
@@ -56,13 +59,16 @@ import com.cognesis.framework.trust.FidesTrustEngine;
 import com.cognesis.framework.trust.TrustEngine;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
+import org.springframework.web.client.RestClient;
 
 import javax.sql.DataSource;
 import java.util.List;
@@ -151,13 +157,62 @@ public class AppConfig {
     // ------------------------------------------------------------------
 
     @Bean
-    public DnsFactsRepository dnsFactsRepository() {
+    public InMemoryDnsFactsRepository inMemoryDnsFactsRepository() {
         return new InMemoryDnsFactsRepository();
+    }
+
+    /**
+     * Primary DNS facts source. In production (and by default) this is the live
+     * repository (DNS-over-HTTPS + RDAP + crt.sh) with the in-memory store as an
+     * offline fallback; tests disable live lookups via {@code cognesis.dns.live.enabled}.
+     */
+    @Bean
+    public DnsFactsRepository dnsFactsRepository(CognesisProperties props,
+                                                 ObjectMapper objectMapper,
+                                                 InMemoryDnsFactsRepository fallback) {
+        CognesisProperties.Dns.Live live = props.getDns().getLive();
+        if (!live.isEnabled()) {
+            return fallback;
+        }
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(java.time.Duration.ofSeconds(live.getTimeoutSeconds()));
+        requestFactory.setReadTimeout(java.time.Duration.ofSeconds(live.getTimeoutSeconds()));
+        RestClient restClient = RestClient.builder().requestFactory(requestFactory).build();
+        return new LiveDnsFactsRepository(restClient, objectMapper, fallback,
+                live.getDohUrl(), live.getRdapUrl(), live.getCrtUrl(), live.getCacheTtlSeconds());
     }
 
     @Bean
     public EvidenceIngestor evidenceIngestor() {
         return new EvidenceIngestor();
+    }
+
+    @Bean
+    public ThreatFeedIngestor threatFeedIngestor(CognesisProperties props,
+                                                 InMemoryDnsFactsRepository inMemoryDnsFactsRepository) {
+        CognesisProperties.Feed feed = props.getFeed();
+        if (!feed.isEnabled() || feed.getUrl().isBlank()) {
+            return new ThreatFeedIngestor(null, inMemoryDnsFactsRepository, "");
+        }
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(java.time.Duration.ofSeconds(feed.getTimeoutSeconds()));
+        requestFactory.setReadTimeout(java.time.Duration.ofSeconds(feed.getTimeoutSeconds()));
+        RestClient restClient = RestClient.builder().requestFactory(requestFactory).build();
+        return new ThreatFeedIngestor(restClient, inMemoryDnsFactsRepository, feed.getUrl());
+    }
+
+    /**
+     * When a feed is configured, refresh it once at startup so live IOCs are
+     * available immediately. Guarded by the ingestor itself; never blocks boot.
+     */
+    @Bean
+    public ApplicationRunner threatFeedStartupRefresh(CognesisProperties props,
+                                                      ThreatFeedIngestor threatFeedIngestor) {
+        return args -> {
+            if (props.getFeed().isEnabled() && !props.getFeed().getUrl().isBlank()) {
+                threatFeedIngestor.refresh();
+            }
+        };
     }
 
     @Bean
@@ -187,6 +242,7 @@ public class AppConfig {
                 new HistoricalTrustAnalyzer(trustEngine),
                 new PolicyAnalyzer(policyEvaluator),
                 new ThreatMemoryAnalyzer(memoryEngine),
+                new ThreatIntelAnalyzer(),
                 new UserBehaviourAnalyzer(trustEngine),
                 new NetworkBehaviourAnalyzer(trustEngine));
     }

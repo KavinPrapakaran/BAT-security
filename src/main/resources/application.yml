@@ -26,6 +26,18 @@ management:
 cognesis:
   security:
     api-keys: cognesis-prod-key-1,cognesis-prod-key-2
+  feed:
+    enabled: true
+    url: "https://urlhaus.abuse.ch/downloads/hostfile/"
+    timeout-seconds: 10
+  dns:
+    live:
+      enabled: true
+      doh-url: "https://cloudflare-dns.com/dns-query"
+      rdap-url: "https://rdap.org/domain"
+      crt-url: "https://crt.sh"
+      timeout-seconds: 6
+      cache-ttl-seconds: 300
   algorithm:
     band:
       monitor: 0.30
