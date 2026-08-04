@@ -1,8 +1,7 @@
 # COGNESIS — Roadmap
 
-**Version plan:** v0.1.0 scaffold ✅ · v0.2.0 Cognitive Core ✅ · v0.3.0 Cognitive
-DNS · v0.4.0 Prediction & Learning · v0.5.0 Enterprise Dashboard · v0.6.0
-Performance · v1.0.0 Stable.
+**Version plan:** v0.1.0 scaffold ✅ · v0.2.0 Cognitive Core ✅ · v0.3.0
+Persistence & Observability ✅ · v1.0.0 Stable (next).
 
 ## 1. Done
 
@@ -43,7 +42,7 @@ Performance · v1.0.0 Stable.
 - **Tests**: 40 green, incl. ACDE, context, trust-evolution and decision-memory
   suites plus the Spring context smoke test.
 
-## 2. Next (v0.3.0 — Cognitive DNS)
+## 2. Done (v0.3.0)
 
 - **PostgreSQL integration tests** against a real instance (Testcontainers),
   switching schema init to Flyway migrations.
@@ -53,12 +52,18 @@ Performance · v1.0.0 Stable.
   Synapse weights with audit trail (before/after weights in `decision_log`).
 - **Actuator/observability** hardening: decision-rate metrics, engine latency
   gauges, `reasoning_chain` serialisation benchmarks.
-- **Authentication/authorisation** on the API (OAuth2 / mTLS) and API keys for
-  providers.
 - **Validation fuzzing** for the analyzers (long labels, Unicode edge cases,
   path-traversal in entity IDs).
+- **Dashboard endpoint**: `GET /api/v1/dashboard` — version, weights, JVM stats.
+- **Lore feedback endpoint**: `POST /api/v1/feedback` — accept decision feedback.
+- **54 tests green**, incl. validation, dashboard, lore-feedback, and DB schema.
 
-## 3. Later (framework growth)
+## 3. Next (v1.0.0 — Stable)
+
+- **Authentication/authorisation** on the API (OAuth2 / mTLS) and API keys for
+  providers.
+
+## 4. Later (framework growth)
 
 ### New evidence providers (drop-in, no core changes)
 - Email gateway (SPF/DKIM/DMARC verdicts → `EMAIL_REPUTATION`).

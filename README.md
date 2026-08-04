@@ -31,11 +31,13 @@ src/main/java/com/cognesis/framework/
   learning/          LORE: weight & baseline learning
   policy/            hard policy rule evaluation
   acde/              ACDE: the single decision-maker (Cognitive Core)
-  persistence/       JDBC stores (decision log, trust profiles)
+  persistence/       JDBC stores (decision log, trust profiles, memory graph)
+  metrics/           Micrometer counters and timers
+  validation/        input validation annotations & validators
   config/            CognesisProperties + Spring wiring
   api/               REST controllers
-src/main/resources/  application.yml, db/schema-h2.sql, db/schema-postgres.sql
-src/test/java/       40 tests (unit + Spring context + H2)
+src/main/resources/  application.yml, db/schema-h2.sql, db/migration/
+src/test/java/       54 tests (unit + Spring context + H2 + validation)
 ```
 
 ## Requirements
@@ -46,7 +48,7 @@ src/test/java/       40 tests (unit + Spring context + H2)
 ## Build & run
 
 ```bash
-mvn test          # 40 tests, all green
+mvn test          # 54 tests, all green
 mvn package       # runnable Spring Boot jar
 mvn spring-boot:run   # dev profile: in-memory H2, port 8080
 ```
