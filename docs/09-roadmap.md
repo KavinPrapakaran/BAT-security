@@ -1,7 +1,8 @@
 # COGNESIS — Roadmap
 
 **Version plan:** v0.1.0 scaffold ✅ · v0.2.0 Cognitive Core ✅ · v0.3.0
-Persistence & Observability ✅ · v1.0.0 Stable ✅.
+Persistence & Observability ✅ · v1.0.0 Stable ✅ · v1.1.0 Detection & live
+intel ✅ · v1.1.1 Hardening ✅.
 
 ## 1. Done
 
@@ -91,7 +92,43 @@ Persistence & Observability ✅ · v1.0.0 Stable ✅.
 - **78 tests green**, incl. 7 new tests (mock-HTTP live facts, fallback &
   cache behaviour, feed-IOC escalation through the ACDE).
 
-## 5. Later (framework growth)
+## 5. Done (v1.1.1 — Hardening)
+
+- **Fail-closed API security**: no default API key is committed
+  (`cognesis.security.api-keys: ""`); the service starts locked and every
+  protected endpoint returns 403 until a key is configured
+  (`COGNESIS_SECURITY_API_KEYS`). Key comparison is constant-time
+  (`MessageDigest.isEqual`); empty-key setups are logged loudly at startup.
+- **Rate limiting**: sliding-window limiter (120 req/min, burst 60,
+  `cognesis.security.rate-limit-*`) after authentication → `429` +
+  `Retry-After: 60` per client; `/actuator/health` and `/actuator/info` exempt.
+- **Persistent IOC store**: feed-flagged domains now persist in an `ioc_flag`
+  table (`IocStore`/`JdbcIocStore`, Flyway `V4__ioc_flags.sql`); flag counts
+  and first-seen survive restarts and scale with a real DB. In-memory variant
+  keeps tests fast.
+- **DoH resolver failover**: if the primary resolver fails, lookups fall over
+  to a secondary (`cognesis.dns.live.doh-fallback-url`, Google); both Cloudflare
+  and Google response formats are handled.
+- **SSRF / request-injection hardening**: live-source domains are validated
+  against a strict label grammar and URL-encoded before any outbound call;
+  unsafe input is rejected with no network contact.
+- **Honest fallback**: when no live source responds, the seed facts are used
+  with an explicit WARN log and a `cognesis.dns.live.fallback` counter instead
+  of silently masquerading as live data.
+- **Scheduled feed refresh + health**: `FeedScheduler` refreshes the feed every
+  `cognesis.feed.refresh-minutes` (default 60); `/actuator/health/feed` reports
+  DOWN when the feed is enabled but never refreshed or stale, and surfaces the
+  live IOC count. Feed metrics (`cognesis.feed.*`) and live-facts cache/fallback
+  counters added.
+- **Coverage gate**: JaCoCo enforces ≥ 70% line / ≥ 55% branch coverage
+  (`mvn verify`); currently 80.9% line / 64.2% branch.
+- **CI depth**: live-feed smoke-test job (real URLhaus feed + PostgreSQL +
+  API + health checks) and a weekly Trivy HIGH/CRITICAL CVE scan
+  (`security-scan.yml`) plus Dependabot.
+- **96 tests green**, incl. 18 new (IOC store persistence, fail-closed posture,
+  rate limiting, DoH failover, SSRF rejection, feed health).
+
+## 6. Later (framework growth)
 
 ### New evidence providers (drop-in, no core changes)
 - Email gateway (SPF/DKIM/DMARC verdicts → `EMAIL_REPUTATION`).
@@ -114,7 +151,7 @@ SYNAPSE and the reasoning-chain format are unchanged.
 - Admin UI to inspect trust, memory, weights, bands, and per-decision chains.
 - SOC playbook integration (SOAR outbound actions from `RecommendedAction`).
 
-## 4. Guiding principles for all future work
+## 7. Guiding principles for all future work
 
 1. Every new signal must map to a `[0,1]` strength with a confidence.
 2. Every new engine must contribute a named slice and a reasoning step.

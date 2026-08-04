@@ -14,6 +14,11 @@ public class CognesisMetrics {
     private final Counter decisionsCounter;
     private final Counter evidenceFragmentsCounter;
     private final Timer acdeTimer;
+    private final Counter feedRefreshCounter;
+    private final Counter feedIocsCounter;
+    private final Counter liveFactsHits;
+    private final Counter liveFactsMisses;
+    private final Counter liveFactsFailures;
 
     public CognesisMetrics(MeterRegistry registry) {
         this.registry = registry;
@@ -26,6 +31,21 @@ public class CognesisMetrics {
         this.acdeTimer = Timer.builder("cognesis.acde.evaluation")
                 .description("ACDE evaluation latency")
                 .publishPercentiles(0.5, 0.95, 0.99)
+                .register(registry);
+        this.feedRefreshCounter = Counter.builder("cognesis.feed.refresh.total")
+                .description("Threat-intel feed refresh attempts")
+                .register(registry);
+        this.feedIocsCounter = Counter.builder("cognesis.feed.iocs.total")
+                .description("Threat-intel IOCs ingested from feeds")
+                .register(registry);
+        this.liveFactsHits = Counter.builder("cognesis.live.facts.cache.hits")
+                .description("Live DNS facts cache hits")
+                .register(registry);
+        this.liveFactsMisses = Counter.builder("cognesis.live.facts.cache.misses")
+                .description("Live DNS facts cache misses")
+                .register(registry);
+        this.liveFactsFailures = Counter.builder("cognesis.live.facts.failures")
+                .description("Live DNS facts lookups that failed all sources")
                 .register(registry);
     }
 
@@ -44,5 +64,22 @@ public class CognesisMetrics {
 
     public void recordAcdeEvaluation(long durationNanos) {
         acdeTimer.record(durationNanos, TimeUnit.NANOSECONDS);
+    }
+
+    public void recordFeedRefresh(int ingested) {
+        feedRefreshCounter.increment();
+        feedIocsCounter.increment(ingested);
+    }
+
+    public void recordLiveFactsHit() {
+        liveFactsHits.increment();
+    }
+
+    public void recordLiveFactsMiss() {
+        liveFactsMisses.increment();
+    }
+
+    public void recordLiveFactsFallback() {
+        liveFactsFailures.increment();
     }
 }

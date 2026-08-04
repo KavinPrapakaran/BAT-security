@@ -63,6 +63,11 @@ CREATE TABLE IF NOT EXISTS outcome_feedback (
     was_correct BOOLEAN NOT NULL, notes TEXT,
     recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS ioc_flag (
+    domain TEXT PRIMARY KEY, flag_count BIGINT NOT NULL DEFAULT 1,
+    first_seen_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
 INSERT INTO policy_rule (rule_name, rule_type, match_target, action, priority, enabled, updated_at)
 SELECT 'Block known malware domains', 'BLOCK_LIST', 'example-malware.test', 'BLOCK', 10, TRUE, CURRENT_TIMESTAMP

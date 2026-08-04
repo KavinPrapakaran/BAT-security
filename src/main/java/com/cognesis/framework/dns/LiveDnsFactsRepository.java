@@ -1,11 +1,14 @@
 package com.cognesis.framework.dns;
 
+import com.cognesis.framework.metrics.CognesisMetrics;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.client.RestClient;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -14,24 +17,29 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 /**
  * Production {@link DnsFactsRepository} that assembles real facts from live
  * public sources instead of sample data:
  *
  * <ul>
- *   <li><b>DNS over HTTPS</b> (Cloudflare) - the AD flag tells us whether the
- *       resolver authenticated the answer via DNSSEC.</li>
+ *   <li><b>DNS over HTTPS</b> (Cloudflare, Google fallback) - the AD flag tells
+ *       us whether the resolver authenticated the answer via DNSSEC.</li>
  *   <li><b>RDAP</b> (rdap.org, registry-agnostic) - registration date (domain
  *       age), registrar, nameservers, and the secureDNS delegation flag.</li>
  *   <li><b>Certificate Transparency</b> (crt.sh) - issuance history, certificate
  *       count, and observed subdomains from SAN entries.</li>
  * </ul>
  *
- * Every lookup is individually guarded: if a source is offline the remaining
+ * <p>Every lookup is individually guarded: if a source is offline the remaining
  * sources still contribute, and if everything fails the repository falls back
- * to the sample facts so the framework keeps working offline. Results are
- * cached for {@code cacheTtlSeconds} to avoid hammering the sources.
+ * to the sample facts so the framework keeps working offline (an honest,
+ * logged fallback). Results are cached for {@code cacheTtlSeconds} to avoid
+ * hammering the sources.
+ *
+ * <p>Domains are strictly validated and URL-encoded before being placed in any
+ * outbound URL, preventing request-injection/SSRF via crafted domain names.
  */
 public class LiveDnsFactsRepository implements DnsFactsRepository {
 
@@ -39,13 +47,19 @@ public class LiveDnsFactsRepository implements DnsFactsRepository {
     private static final int MAX_SUBDOMAINS = 40;
     private static final int MAX_CERTIFICATES = 200;
 
+    /** A label can only be alphanumeric or hyphen; no separators, slashes or query chars. */
+    private static final Pattern SAFE_DOMAIN = Pattern.compile(
+            "^(?!-)[a-z0-9-]{1,63}(\\.[a-z0-9-]{1,63})*$");
+
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
     private final DnsFactsRepository fallback;
     private final String dohUrl;
+    private final String dohFallbackUrl;
     private final String rdapUrl;
     private final String crtUrl;
     private final long cacheTtlSeconds;
+    private final CognesisMetrics metrics;
 
     private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
 
@@ -53,28 +67,39 @@ public class LiveDnsFactsRepository implements DnsFactsRepository {
                                   ObjectMapper objectMapper,
                                   DnsFactsRepository fallback,
                                   String dohUrl,
+                                  String dohFallbackUrl,
                                   String rdapUrl,
                                   String crtUrl,
-                                  long cacheTtlSeconds) {
+                                  long cacheTtlSeconds,
+                                  CognesisMetrics metrics) {
         this.restClient = restClient;
         this.objectMapper = objectMapper;
         this.fallback = fallback;
         this.dohUrl = dohUrl;
+        this.dohFallbackUrl = dohFallbackUrl;
         this.rdapUrl = rdapUrl;
         this.crtUrl = crtUrl;
         this.cacheTtlSeconds = cacheTtlSeconds;
+        this.metrics = metrics;
     }
 
     @Override
     public DnsFacts factsFor(String domain) {
         String key = normalize(domain);
-        if (key.isEmpty()) {
+        if (key.isEmpty() || !isSafeDomain(key)) {
+            log.warn("Rejecting unsafe domain input for live lookup: '{}'", domain);
             return fallback.factsFor(domain);
         }
 
         CacheEntry hit = cache.get(key);
         if (hit != null && !hit.isStale(cacheTtlSeconds)) {
+            if (metrics != null) {
+                metrics.recordLiveFactsHit();
+            }
             return hit.facts;
+        }
+        if (metrics != null) {
+            metrics.recordLiveFactsMiss();
         }
 
         DnsFacts live = collect(key);
@@ -91,13 +116,20 @@ public class LiveDnsFactsRepository implements DnsFactsRepository {
         boolean dnssec = false;
         boolean dnsFromDoh = false;
 
-        JsonNode rdap = fetchJson(rdapUrl + "/" + domain);
-        JsonNode crt = fetchJson(crtUrl + "/?q=" + domain + "&output=json");
+        String encoded = URLEncoder.encode(domain, StandardCharsets.UTF_8);
+        JsonNode rdap = fetchJson(rdapUrl + "/" + encoded);
+        JsonNode crt = fetchJson(crtUrl + "/?q=" + encoded + "&output=json");
 
-        JsonNode doh = fetchJson(dohUrl + "?name=" + domain + "&type=A");
-        if (doh != null && doh.path("Status").asInt(-1) == 0) {
+        JsonNode doh = fetchJson(dohUrl + "?name=" + encoded + "&type=A");
+        if (doh == null || dohStatus(doh) != 0) {
+            // primary DoH failed or refused; try the fallback resolver
+            if (dohFallbackUrl != null && !dohFallbackUrl.isBlank()) {
+                doh = fetchJson(dohFallbackUrl + "?name=" + encoded + "&type=A");
+            }
+        }
+        if (doh != null && dohStatus(doh) == 0) {
             dnsFromDoh = true;
-            dnssec = doh.path("AD").asBoolean(false);
+            dnssec = dohDnssec(doh);
         }
 
         long ageDays = rdapAgeDays(rdap, domain);
@@ -129,11 +161,17 @@ public class LiveDnsFactsRepository implements DnsFactsRepository {
     /**
      * Carries over state that only the in-memory store keeps (feed IOC flags).
      * If no live data could be collected at all, the fallback facts stand in
-     * wholesale so the framework keeps working offline.
+     * wholesale — logged, so callers know the verdict rested on sample data.
      */
     private DnsFacts mergeWithFallback(DnsFacts live, DnsFacts fromFallback) {
         boolean liveHasData = live.ageDays() > 0 || live.dnssecValid()
                 || live.certificateCount() > 0 || !live.subdomains().isEmpty();
+        if (!liveHasData) {
+            log.warn("No live source responded for '{}'; using fallback facts", live.domain());
+            if (metrics != null) {
+                metrics.recordLiveFactsFallback();
+            }
+        }
         DnsFacts base = liveHasData ? live : withDomain(fromFallback, live.domain());
         return new DnsFacts(
                 base.domain(),
@@ -172,6 +210,16 @@ public class LiveDnsFactsRepository implements DnsFactsRepository {
             log.debug("Live DNS source unreachable for {}: {}", url, e.getMessage());
             return null;
         }
+    }
+
+    /** Accepts both Cloudflare (Status) and Google (status) DoH casing. */
+    private static int dohStatus(JsonNode doh) {
+        int status = doh.path("Status").asInt(-1);
+        return status >= 0 ? status : doh.path("status").asInt(-1);
+    }
+
+    private static boolean dohDnssec(JsonNode doh) {
+        return doh.path("AD").asBoolean(false) || doh.path("ad").asBoolean(false);
     }
 
     private long rdapAgeDays(JsonNode rdap, String domain) {
@@ -241,6 +289,14 @@ public class LiveDnsFactsRepository implements DnsFactsRepository {
             }
         }
         return latest;
+    }
+
+    /** Loose but complete sanity check; per-label rules enforced by {@link #isSafeDomain}. */
+    private static boolean isSafeDomain(String domain) {
+        if (domain.length() > 253) {
+            return false;
+        }
+        return SAFE_DOMAIN.matcher(domain).matches();
     }
 
     private static String normalize(String domain) {

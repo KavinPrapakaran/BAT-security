@@ -21,7 +21,8 @@ src/main/java/com/cognesis/framework/
   math/              LogitOps (log-odds fusion, entropy, decisiveness)
   observatory/       evidence ingestion & aggregation (dominant-signal rule)
   dns/               CODE: Cognitive DNS Engine + 16 analyzers + live facts
-                     (DoH, RDAP/WHOIS, crt.sh) with offline fallback
+                     (DoH with resolver failover, RDAP/WHOIS, crt.sh) with
+                     honest offline fallback and SSRF-hardened input
   trust/             FIDES: dynamic asymmetric trust engine
   memory/            MNEMONIC: episodic knowledge graph + spreading activation
   context/           CONTEXT: situational environment risk
@@ -32,16 +33,20 @@ src/main/java/com/cognesis/framework/
   learning/          LORE: weight & baseline learning
   policy/            hard policy rule evaluation
   acde/              ACDE: the single decision-maker (Cognitive Core)
-  persistence/       JDBC stores (decision log, trust profiles, memory graph)
+  persistence/       JDBC stores (decision log, trust profiles, memory graph,
+                     persistent IOC flag store)
   metrics/           Micrometer counters and timers
   validation/        input validation annotations & validators
-  security/          API key authentication filter
+  security/          fail-closed API key filter (constant-time compare) +
+                     sliding-window rate limiter
   detection/         Sigma + YARA rule export for COGNESIS verdicts
-  feed/              live threat-intel feed ingestion (abuse.ch, configurable)
+  feed/              threat-intel feed ingestion (abuse.ch, configurable),
+                     scheduled refresh + health indicator
   config/            CognesisProperties + Spring wiring
   api/               REST controllers
 src/main/resources/  application.yml, db/schema-h2.sql, db/migration/
-src/test/java/       78 tests (unit + Spring context + H2 + validation + security + detection + feed + live facts)
+src/test/java/       96 tests (unit + Spring context + H2 + validation + security
+                     + rate limiting + detection + feed + live facts + IOC persistence)
 ```
 
 ## Requirements
@@ -52,11 +57,28 @@ src/test/java/       78 tests (unit + Spring context + H2 + validation + securit
 ## Build & run
 
 ```bash
-mvn test          # 78 tests, all green
+mvn verify        # 96 tests + JaCoCo coverage gate (70% line / 55% branch)
 mvn package       # runnable Spring Boot jar
 mvn spring-boot:run   # dev profile: in-memory H2, port 8080
 docker compose up --build   # containerised, live feed + live DNS on by default
 ```
+
+## Authentication (fail-closed)
+
+Every `/api/v1/**` endpoint requires a valid API key in the `X-API-Key` header.
+The service starts **locked**: no default key is committed. Set one before the
+first request:
+
+```bash
+export COGNESIS_SECURITY_API_KEYS=your-secret-key        # comma-separated for several
+```
+
+with `mvn spring-boot:run`, or `COGNESIS_SECURITY_API_KEYS=... docker compose up --build`.
+Requests without a matching key receive `403 Forbidden`; the key comparison is
+constant-time. The `/actuator/health` and `/actuator/info` endpoints stay open
+for orchestration probes. Protect the API further with the built-in per-client
+rate limiter (`cognesis.security.rate-limit-*`, on by default: 120 req/min
+burst 60, `429 Too Many Requests` when exceeded).
 
 ## Quick start (REST)
 
@@ -64,6 +86,7 @@ Evaluate a DNS resolution:
 
 ```bash
 curl -s http://localhost:8080/api/v1/dns/evaluate \
+  -H 'X-API-Key: your-secret-key' \
   -H 'Content-Type: application/json' \
   -d '{"domain":"paypa1.com","clientId":"alice","clientIp":"10.1.1.5"}'
 ```
@@ -72,6 +95,7 @@ Evaluate any entity through the ACDE (the single decision-maker):
 
 ```bash
 curl -s http://localhost:8080/api/v1/decisions/evaluate \
+  -H 'X-API-Key: your-secret-key' \
   -H 'Content-Type: application/json' \
   -d '{"entityId":"evil.example","entityType":"DOMAIN","requestor":"soc",
        "affectedAssetIds":["asset-billing"],"activity":"dns-resolution",
@@ -84,16 +108,22 @@ Export a verdict as SIEM-ready detection content (Sigma + YARA):
 
 ```bash
 curl -s http://localhost:8080/api/v1/detections/dns \
+  -H 'X-API-Key: your-secret-key' \
   -H 'Content-Type: application/json' \
   -d '{"domain":"paypa1.com","clientId":"alice","clientIp":"10.1.1.5"}'
 ```
 
 Trigger a threat-intel feed refresh (abuse.ch / URLhaus host file; on by
-default via `cognesis.feed.*`, ingested once at startup and on demand):
+default via `cognesis.feed.*`, ingested at startup, on demand, and on a
+schedule; flagged IOCs are persisted and survive restarts):
 
 ```bash
-curl -s -X POST http://localhost:8080/api/v1/feeds/refresh
+curl -s -X POST http://localhost:8080/api/v1/feeds/refresh \
+  -H 'X-API-Key: your-secret-key'
 ```
+
+Live-source health is exposed at `/actuator/health/feed` (DOWN when the feed is
+enabled but never refreshed or stale).
 
 ## The engines
 

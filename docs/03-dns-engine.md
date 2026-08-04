@@ -13,9 +13,10 @@ Implemented in `dns/*`:
   fragments and asks the **ACDE** (`acde/AcdeEngine`) to decide.
 - `DnsSignalAnalyzer` (interface) + **16 analyzers** in `dns/analyzer/`.
 - `DnsFacts` / `DnsFactsRepository` and `DnsSignal`.
-- `LiveDnsFactsRepository` — real-world facts from DNS-over-HTTPS (DoH),
-  RDAP/WHOIS and certificate-transparency (crt.sh), cached + time-boxed,
-  falling back to the in-memory seed data when offline.
+- `LiveDnsFactsRepository` — real-world facts from DNS-over-HTTPS (DoH,
+  primary + secondary resolver), RDAP/WHOIS and certificate-transparency
+  (crt.sh), cached + time-boxed, with SSRF-hardened input and honest fallback
+  to the in-memory seed data when offline.
 - `DnsDecision` — the verdict, reusing the framework `DecisionResult` shape.
 
 ---
@@ -159,20 +160,29 @@ policy tags).
 
 Two repositories implement `DnsFactsRepository`:
 
-- `InMemoryDnsFactsRepository` — deterministic seed data (tests, offline dev).
+- `InMemoryDnsFactsRepository` — deterministic seed data (tests, offline dev),
+  now backed by a persistent `IocStore` so feed flags survive restarts.
 - `LiveDnsFactsRepository` — the default in production. It queries three public
   sources per domain, each guarded with try/catch and a connect/read timeout:
   - **Cloudflare DoH** (`https://cloudflare-dns.com/dns-query`) — A records; the
-    `AD` (authentic data) flag becomes the `dnssecValid` fact.
+    `AD` (authentic data) flag becomes the `dnssecValid` fact. If the primary
+    resolver fails, the lookup falls over to a **secondary resolver**
+    (`cognesis.dns.live.doh-fallback-url`, Google by default); both Cloudflare
+    and Google response formats are accepted.
   - **RDAP/WHOIS** (`https://rdap.org/domain`) — registration date → `ageDays`,
     `secureDNS.delegationSigned` → DNSSEC, registrar name.
   - **crt.sh** (`https://crt.sh`) — certificate transparency SAN entries →
     `subdomains`, `certificateCount`, `certificateIssuedAt`.
 
-  Results are cached for `cognesis.dns.live.cache-ttl-seconds`. If no source
-  responds the repository falls back wholesale to the in-memory sample facts,
-  so the engine never fails on transient network issues. Enable/disable via
-  `cognesis.dns.live.enabled` (off by default in tests, on in production).
+  Every lookup domain is **validated and URL-encoded** before any outbound
+  call (strict label grammar rejects path/query injection outright), and a
+  `cognesis-demo/1.0` User-Agent is sent. Results are cached for
+  `cognesis.dns.live.cache-ttl-seconds`. If **no** live source responds the
+  repository falls back wholesale to the in-memory sample facts — but it does
+  so honestly: a `WARN` log and a `cognesis.dns.live.fallback` counter make the
+  degraded mode visible, and the sample facts' `maliciousFlagCount` is carried
+  into the merged result. Enable/disable via `cognesis.dns.live.enabled` (off
+  by default in tests, on in production).
 
 ## 7. REST interface
 

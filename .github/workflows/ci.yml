@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Build & test (Java 21)
+    name: Build, test & coverage gate (Java 21)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,8 +21,8 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Build and run tests
-        run: mvn -B --no-transfer-progress test
+      - name: Run tests with coverage gate
+        run: mvn -B --no-transfer-progress verify
 
       - name: Package runnable jar
         run: mvn -B --no-transfer-progress package -DskipTests
@@ -33,3 +33,76 @@ jobs:
         with:
           name: surefire-reports
           path: target/surefire-reports/**
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/**
+
+  smoke:
+    name: Live-feed smoke test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: cognesis
+          POSTGRES_USER: cognesis
+          POSTGRES_PASSWORD: cognesis
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cognesis"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      COGNESIS_DATASOURCE_URL: jdbc:postgresql://localhost:5432/cognesis
+      COGNESIS_DATASOURCE_USERNAME: cognesis
+      COGNESIS_DATASOURCE_PASSWORD: cognesis
+      COGNESIS_SECURITY_API_KEYS: ci-smoke-test-key
+      COGNESIS_FEED_URL: https://urlhaus.abuse.ch/downloads/text_online/
+      COGNESIS_FEED_ENABLED: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build runnable jar
+        run: mvn -B --no-transfer-progress package -DskipTests -Ppostgres
+
+      - name: Boot app and ingest live feed
+        run: |
+          nohup java -jar target/cognesis-framework-1.0.0-SNAPSHOT.jar > app.log 2>&1 &
+          for i in $(seq 1 60); do
+            if grep -q "Started CognesisApplication" app.log; then break; fi
+            sleep 2
+          done
+          grep -q "Started CognesisApplication" app.log || { echo "app failed to start"; cat app.log; exit 1; }
+
+      - name: Exercise live lookups and check feed ingestion
+        run: |
+          curl -sfS -H "X-API-Key: ci-smoke-test-key" \
+            "http://localhost:8080/api/v1/dashboard" > /dev/null
+          curl -sfS -H "X-API-Key: ci-smoke-test-key" \
+            "http://localhost:8080/api/v1/dns/evaluate?domain=example.com" > /dev/null
+          sleep 5
+          curl -sfS http://localhost:8080/actuator/health | grep -q '"status":"UP"'
+          IOCS=$(curl -sfS http://localhost:8080/actuator/health/feed | sed -n 's/.*"iocs":\([0-9]*\).*/\1/p')
+          echo "live feed IOCs loaded: ${IOCS:-0}"
+          grep -qi "feed.*refresh\|ingested" app.log && echo "feed activity logged"
+
+      - name: Upload app log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-app-log
+          path: app.log

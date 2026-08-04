@@ -1,5 +1,7 @@
 package com.cognesis.framework.dns;
 
+import com.cognesis.framework.persistence.IocStore;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -11,6 +13,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * return healthy, long-lived facts; unknown domains return the profile of a
  * brand-new, weakly-validated domain (the common case an analyst faces when a
  * truly new domain is encountered).
+ *
+ * <p>When a {@link IocStore} is present, threat-intel flags are persisted
+ * there and reloaded on every {@link #factsFor} lookup, so live feed
+ * indicators survive restarts.
  */
 public class InMemoryDnsFactsRepository implements DnsFactsRepository {
 
@@ -20,8 +26,14 @@ public class InMemoryDnsFactsRepository implements DnsFactsRepository {
             1, false, 0);
 
     private final Map<String, DnsFacts> facts = new ConcurrentHashMap<>();
+    private final IocStore iocStore;
 
     public InMemoryDnsFactsRepository() {
+        this(null);
+    }
+
+    public InMemoryDnsFactsRepository(IocStore iocStore) {
+        this.iocStore = iocStore;
         Instant now = Instant.now();
         facts.put("google.com", new DnsFacts("google.com", 32000L, true, 1, 0, 0.02,
                 List.of("www", "mail", "drive", "maps"), "disabled",
@@ -50,22 +62,36 @@ public class InMemoryDnsFactsRepository implements DnsFactsRepository {
     public DnsFacts factsFor(String domain) {
         String key = normalize(domain);
         DnsFacts known = facts.get(key);
+        int extraFlags = iocStore == null ? 0 : iocStore.flagCount(key);
         if (known != null) {
-            return known;
+            return extraFlags > 0 ? withFlags(known, known.maliciousFlagCount() + extraFlags) : known;
         }
         return new DnsFacts(
                 key, UNKNOWN_DOMAIN.ageDays(), false, 1, 1, 0.45,
                 List.of(), "enabled", Instant.now().minusSeconds(86400),
-                1, false, 0);
+                1, false, extraFlags);
+    }
+
+    private static DnsFacts withFlags(DnsFacts facts, int flagCount) {
+        return new DnsFacts(facts.domain(), facts.ageDays(), facts.dnssecValid(),
+                facts.registrarCount(), facts.nameServerChanges(), facts.ipRecordChurn(),
+                facts.subdomains(), facts.whoisPrivacy(), facts.certificateIssuedAt(),
+                facts.certificateCount(), facts.certificateInCtLogs(), flagCount);
     }
 
     /**
      * Marks a domain as previously-flagged (IOC). Used by threat-intel feed
      * ingestion so that live feeds (e.g. abuse.ch) influence future verdicts.
+     * With a configured {@link IocStore} the flag is persisted; otherwise it
+     * is kept in memory only.
      */
     public void flagMalicious(String domain) {
         String key = normalize(domain);
         if (key.isEmpty()) {
+            return;
+        }
+        if (iocStore != null) {
+            iocStore.flag(key);
             return;
         }
         facts.compute(key, (k, existing) -> existing == null

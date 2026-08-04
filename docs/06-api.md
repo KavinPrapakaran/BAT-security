@@ -159,15 +159,20 @@ Flagged domains (`maliciousFlagCount`) flow into ACDE verdicts via
 ```yaml
 cognesis:
   security:
-    api-keys: cognesis-prod-key-1,cognesis-prod-key-2
+    api-keys: ""                    # FAIL-CLOSED: no default. Set e.g. "key1,key2"
+    rate-limit-enabled: true
+    rate-limit-per-minute: 120
+    rate-limit-burst: 60
   feed:
     enabled: true
     url: "https://urlhaus.abuse.ch/downloads/hostfile/"
     timeout-seconds: 10
+    refresh-minutes: 60             # scheduled auto-refresh (0 = disabled)
   dns:
     live:
       enabled: true
       doh-url: "https://cloudflare-dns.com/dns-query"
+      doh-fallback-url: "https://dns.google/resolve"   # secondary resolver
       rdap-url: "https://rdap.org/domain"
       crt-url: "https://crt.sh"
       timeout-seconds: 6
@@ -188,14 +193,29 @@ cognesis:
     escalate-when-uncertain: true
 ```
 
-`feed.enabled: true` fetches the URLhaus host-file once at startup and on
-`POST /api/v1/feeds/refresh`. Set `cognesis.dns.live.enabled: false` (or unset
-URLs) to use the in-memory seed facts; every live source is individually
-time-boxed and the engine falls back gracefully when offline.
+`feed.enabled: true` fetches the URLhaus host-file once at startup, on
+`POST /api/v1/feeds/refresh`, and every `feed.refresh-minutes` (via
+`@Scheduled`). Flagged IOCs are written to the persistent IOC store
+(`ioc_flag` table) so flag counts survive restarts. Set
+`cognesis.dns.live.enabled: false` (or unset URLs) to use the in-memory seed
+facts. Each live source is individually time-boxed; the DoH lookup falls over
+to `doh-fallback-url` when the primary resolver fails, and only when every
+live source is silent does the engine fall back to the seed facts (with an
+explicit `WARN` log and a `cognesis.dns.live.fallback` counter). Domains are
+validated and URL-encoded before any outbound call.
 
 ## 10. Security
 
-`/api/v1/**` and `/actuator/**` (except `/actuator/health`) require an API key:
-`Authorization: Bearer <key>` or `X-API-Key: <key>`. Keys configured via
-`cognesis.security.api-keys` (comma-separated). Unauthorised requests → 403.
-The new detection and feed endpoints follow the same rule.
+`/api/v1/**` and `/actuator/**` (except `/actuator/health` and
+`/actuator/info`) require an API key: `Authorization: Bearer <key>` or
+`X-API-Key: <key>`. Keys configured via `cognesis.security.api-keys`
+(comma-separated). **The service starts fail-closed**: with no keys
+configured every protected endpoint returns 403, and no default key is
+committed to the repository. Key comparison is constant-time
+(`MessageDigest.isEqual`). Unauthorised requests → 403.
+
+A sliding-window rate limiter (default 120 req/min per client, burst 60,
+`cognesis.security.rate-limit-*`) runs after authentication and returns
+`429 Too Many Requests` with `Retry-After: 60` when a client exceeds its
+window. Health details at `/actuator/health/feed` report feed state and the
+live IOC count.

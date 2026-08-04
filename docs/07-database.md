@@ -1,11 +1,12 @@
 # COGNESIS — Database
 
-Two schemas ship in `src/main/resources/db/`:
+Two schema sources ship in `src/main/resources/db/`:
 
 - **`schema-h2.sql`** — dev/test, run by Spring Boot on the in-memory H2
   database configured with `MODE=PostgreSQL`. Mirrors the production schema.
-- **`schema-postgres.sql`** — authoritative production DDL (TIMESTAMPTZ, JSONB,
-  BIGSERIAL, pgcrypto UUIDs, indexes).
+- **Flyway migrations (`db/migration/V1..V4`)** — authoritative production DDL
+  (TIMESTAMPTZ, JSONB, BIGSERIAL, pgcrypto UUIDs, indexes); applied to
+  PostgreSQL under the `postgres` profile.
 
 ---
 
@@ -68,6 +69,20 @@ averages criticality+sensitivity of the assets linked to a decision.
 Closed-loop learning ledger: `decision_id` → `realized_risk`, `was_correct`,
 notes. Feeds weight updates in `LoreLearningEngine`.
 
+### ioc_flag (IOC store)
+Persistent threat-intel flags from the feed (Flyway `V4__ioc_flags.sql`):
+
+| Column | Notes |
+|---|---|
+| `domain` | TEXT PRIMARY KEY |
+| `flag_count` | BIGINT, incremented each time the feed re-flags it |
+| `first_seen_at`, `last_seen_at` | TIMESTAMPTZ; `first_seen_at` is immutable |
+
+`JdbcIocStore` upserts on flag (UPDATE, else INSERT); `first_seen_at` is
+preserved across reflags. Read through `IocStore` into the DNS facts
+(`maliciousFlagCount`), so feed flags survive restarts and a shared DB scales
+the store horizontally.
+
 ## 2. Seed data
 
 Both schemas seed a baseline:
@@ -85,7 +100,7 @@ Both schemas seed a baseline:
 |---|---|---|
 | Driver | H2 (`MODE=PostgreSQL`) | PostgreSQL 14+ |
 | Data | ephemeral in-memory | persistent |
-| Schema load | `spring.sql.init` on startup | migrations (e.g. Flyway) |
+| Schema load | `spring.sql.init` on startup | Flyway migrations (`V1..V4`) |
 | Types | TEXT / BIGINT IDENTITY / UUID | TIMESTAMPTZ / JSONB / BIGSERIAL |
 
 To switch profiles:

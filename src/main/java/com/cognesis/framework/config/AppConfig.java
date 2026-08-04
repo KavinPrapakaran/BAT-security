@@ -39,11 +39,14 @@ import com.cognesis.framework.learning.LoreLearningEngine;
 import com.cognesis.framework.learning.WeightStore;
 import com.cognesis.framework.memory.MemoryEngine;
 import com.cognesis.framework.memory.MnemonicMemoryEngine;
+import com.cognesis.framework.metrics.CognesisMetrics;
 import com.cognesis.framework.observatory.DnsEvidenceProvider;
 import com.cognesis.framework.observatory.EvidenceIngestor;
 import com.cognesis.framework.observatory.EvidenceProvider;
 import com.cognesis.framework.persistence.DecisionLogDao;
+import com.cognesis.framework.persistence.IocStore;
 import com.cognesis.framework.persistence.JdbcDecisionLogDao;
+import com.cognesis.framework.persistence.JdbcIocStore;
 import com.cognesis.framework.persistence.JdbcMemoryGraphDao;
 import com.cognesis.framework.persistence.JdbcTrustProfileStore;
 import com.cognesis.framework.persistence.MemoryGraphDao;
@@ -157,8 +160,13 @@ public class AppConfig {
     // ------------------------------------------------------------------
 
     @Bean
-    public InMemoryDnsFactsRepository inMemoryDnsFactsRepository() {
-        return new InMemoryDnsFactsRepository();
+    public IocStore iocStore(NamedParameterJdbcTemplate jdbcTemplate) {
+        return new JdbcIocStore(jdbcTemplate);
+    }
+
+    @Bean
+    public InMemoryDnsFactsRepository inMemoryDnsFactsRepository(IocStore iocStore) {
+        return new InMemoryDnsFactsRepository(iocStore);
     }
 
     /**
@@ -169,7 +177,8 @@ public class AppConfig {
     @Bean
     public DnsFactsRepository dnsFactsRepository(CognesisProperties props,
                                                  ObjectMapper objectMapper,
-                                                 InMemoryDnsFactsRepository fallback) {
+                                                 InMemoryDnsFactsRepository fallback,
+                                                 CognesisMetrics metrics) {
         CognesisProperties.Dns.Live live = props.getDns().getLive();
         if (!live.isEnabled()) {
             return fallback;
@@ -179,7 +188,8 @@ public class AppConfig {
         requestFactory.setReadTimeout(java.time.Duration.ofSeconds(live.getTimeoutSeconds()));
         RestClient restClient = RestClient.builder().requestFactory(requestFactory).build();
         return new LiveDnsFactsRepository(restClient, objectMapper, fallback,
-                live.getDohUrl(), live.getRdapUrl(), live.getCrtUrl(), live.getCacheTtlSeconds());
+                live.getDohUrl(), live.getDohFallbackUrl(), live.getRdapUrl(), live.getCrtUrl(),
+                live.getCacheTtlSeconds(), metrics);
     }
 
     @Bean
@@ -189,16 +199,17 @@ public class AppConfig {
 
     @Bean
     public ThreatFeedIngestor threatFeedIngestor(CognesisProperties props,
-                                                 InMemoryDnsFactsRepository inMemoryDnsFactsRepository) {
+                                                 InMemoryDnsFactsRepository inMemoryDnsFactsRepository,
+                                                 CognesisMetrics metrics) {
         CognesisProperties.Feed feed = props.getFeed();
         if (!feed.isEnabled() || feed.getUrl().isBlank()) {
-            return new ThreatFeedIngestor(null, inMemoryDnsFactsRepository, "");
+            return new ThreatFeedIngestor(null, inMemoryDnsFactsRepository, "", metrics);
         }
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(java.time.Duration.ofSeconds(feed.getTimeoutSeconds()));
         requestFactory.setReadTimeout(java.time.Duration.ofSeconds(feed.getTimeoutSeconds()));
         RestClient restClient = RestClient.builder().requestFactory(requestFactory).build();
-        return new ThreatFeedIngestor(restClient, inMemoryDnsFactsRepository, feed.getUrl());
+        return new ThreatFeedIngestor(restClient, inMemoryDnsFactsRepository, feed.getUrl(), metrics);
     }
 
     /**

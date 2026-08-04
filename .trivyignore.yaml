@@ -1,0 +1,2 @@
+# Trivy configuration for the filesystem scan (see .github/workflows/security-scan.yml).
+# Suppressions are documented; add entries only when a fix genuinely does not exist.

@@ -11,9 +11,11 @@ All commands assume you are in the repository root.
 
 ## 1. Run it
 
-Docker (feed + live DNS enabled by default via `docker-compose.yml`):
+Docker (feed + live DNS enabled by default via `docker-compose.yml`). The API
+is **fail-closed**: configure at least one key first:
 
 ```bash
+export COGNESIS_SECURITY_API_KEYS=your-secret-key
 docker compose up --build
 ```
 
@@ -30,8 +32,11 @@ live threat feed being ingested:
 Threat feed refresh: 1234 IOCs ingested from https://urlhaus.abuse.ch/downloads/hostfile/
 ```
 
-> The feed refresh runs **once at startup** (and on demand, see §4). Startup
-> never fails if the feed is offline — ingestion is guarded and time-boxed.
+> The feed refresh runs **at startup**, on a schedule (default every 60 min,
+> `cognesis.feed.refresh-minutes`), and on demand (see §4). Startup never fails
+> if the feed is offline — ingestion is guarded and time-boxed. Flagged IOCs
+> are persisted in the `ioc_flag` table and survive restarts; live-source
+> health is exposed at `/actuator/health/feed`.
 
 ## 2. Evaluate a domain with live facts
 

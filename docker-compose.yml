@@ -7,10 +7,15 @@ services:
       - "8080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: dev
+      # Fail-closed API keys. Set before first request, e.g.:
+      #   $env:COGNESIS_SECURITY_API_KEYS = "your-secret-key"   (PowerShell)
+      #   export COGNESIS_SECURITY_API_KEYS=your-secret-key     (bash)
+      COGNESIS_SECURITY_API_KEYS: "${COGNESIS_SECURITY_API_KEYS:-change-me-before-deploying}"
       COGNESIS_FEED_ENABLED: "true"
       COGNESIS_FEED_URL: "https://urlhaus.abuse.ch/downloads/hostfile/"
       COGNESIS_DNS_LIVE_ENABLED: "true"
       COGNESIS_DNS_LIVE_DOH-URL: "https://cloudflare-dns.com/dns-query"
+      COGNESIS_DNS_LIVE_DOH_FALLBACK-URL: "https://dns.google/resolve"
       COGNESIS_DNS_LIVE_RDAP-URL: "https://rdap.org/domain"
       COGNESIS_DNS_LIVE_CRT-URL: "https://crt.sh"
     restart: unless-stopped

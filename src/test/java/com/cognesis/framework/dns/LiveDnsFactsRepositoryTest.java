@@ -20,6 +20,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 class LiveDnsFactsRepositoryTest {
 
     private static final String DOH = "http://localhost/dns-query";
+    private static final String DOH_FALLBACK = "http://localhost/fallback-dns";
     private static final String RDAP = "http://localhost/rdap";
     private static final String CRT = "http://localhost/crt";
 
@@ -29,7 +30,7 @@ class LiveDnsFactsRepositoryTest {
         RestClient.Builder builder = RestClient.builder().baseUrl("http://localhost");
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).ignoreExpectOrder(true).build();
         LiveDnsFactsRepository repo = new LiveDnsFactsRepository(builder.build(), new ObjectMapper(), fallback,
-                DOH, RDAP, CRT, 3600);
+                DOH, DOH_FALLBACK, RDAP, CRT, 3600, null);
         return new Harness(server, repo);
     }
 
@@ -58,6 +59,7 @@ class LiveDnsFactsRepositoryTest {
     void fallsBackWholesaleWhenEverySourceIsOffline() {
         Harness h = harness();
         h.server.expect(requestTo(DOH + "?name=google.com&type=A")).andRespond(withServerError());
+        h.server.expect(requestTo(DOH_FALLBACK + "?name=google.com&type=A")).andRespond(withServerError());
         h.server.expect(requestTo(RDAP + "/google.com")).andRespond(withServerError());
         h.server.expect(requestTo(CRT + "/?q=google.com&output=json")).andRespond(withServerError());
 
@@ -115,6 +117,36 @@ class LiveDnsFactsRepositoryTest {
         assertEquals(first, second);
         assertEquals("cache.me", second.domain());
         h.server.verify(); // second call must have hit the cache, not the network
+    }
+
+    @Test
+    void fallsBackToSecondaryResolverWhenPrimaryDohFails() {
+        Harness h = harness();
+        String doh = "{\"status\":0,\"ad\":true,\"Answer\":[]}";
+        String rdap = "{\"events\":[{\"eventAction\":\"registration\",\"eventDate\":\"2015-01-01T00:00:00Z\"}]}";
+        String crt = "[]";
+        h.server.expect(requestTo(DOH + "?name=fallback.me&type=A")).andRespond(withServerError());
+        h.server.expect(requestTo(DOH_FALLBACK + "?name=fallback.me&type=A")).andRespond(withSuccess(doh, org.springframework.http.MediaType.APPLICATION_JSON));
+        h.server.expect(requestTo(RDAP + "/fallback.me")).andRespond(withSuccess(rdap, org.springframework.http.MediaType.APPLICATION_JSON));
+        h.server.expect(requestTo(CRT + "/?q=fallback.me&output=json")).andRespond(withSuccess(crt, org.springframework.http.MediaType.APPLICATION_JSON));
+
+        DnsFacts facts = h.repo.factsFor("fallback.me");
+
+        assertTrue(facts.dnssecValid(), "secondary resolver AD flag (Google lowercase style) must be honoured");
+        assertEquals(0.1, facts.ipRecordChurn(), 0.01, "a working DoH lookup must not look like churn");
+    }
+
+    @Test
+    void rejectsUnsafeDomainInputWithoutAnyNetworkCall() {
+        Harness h = harness();
+        String malicious = "evil.example/../../etc/passwd";
+
+        DnsFacts facts = h.repo.factsFor(malicious);
+
+        // If a request were attempted against the mocked server it would throw
+        // "no further requests expected"; reaching here proves no outbound call.
+        assertEquals("evil.example/../../etc/passwd", facts.domain());
+        h.server.verify();
     }
 
     private static class Harness {

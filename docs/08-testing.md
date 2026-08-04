@@ -28,16 +28,24 @@
 | `CognesisApplicationTests` | Spring wiring + H2 | 3 tests: context loads; DNS decision persisted to DB; ACDE runs through pipeline |
 | `DetectionRuleGeneratorTest` | Sigma + YARA export | 4 tests: well-formed Sigma (dns_query, level per band); severity mapping; well-formed YARA (domain + claims, risk score); bundle filenames |
 | `ThreatFeedIngestorTest` | abuse.ch-style feed ingestion | 5 tests: host-file parsing flags IOCs; comments/blanks ignored; flags accumulate; disabled feed skips network; unreachable feed swallowed |
-| `LiveDnsFactsRepositoryTest` | live DNS/RDAP/CT facts via mock HTTP | 5 tests: assembles facts from all three sources; wholesale fallback when every source is offline; partial failure still uses responding sources; feed flags survive the live merge; results cached (no second network round-trip) |
+| `LiveDnsFactsRepositoryTest` | live DNS/RDAP/CT facts via mock HTTP | 7 tests: assembles facts from all three sources; wholesale fallback when every source is offline; partial failure still uses responding sources; feed flags survive the live merge; results cached (no second network round-trip); **secondary DoH resolver failover (Google-format response)**; **unsafe domain input rejected with no outbound call** |
 | `IocEscalationTest` | feed IOC → ACDE verdict | 2 tests: flagged domain strictly riskier + non-ALLOW; reasoning chain contains the `CODE:THREAT_INTEL` step |
+| `JdbcIocStoreTest` | persistent IOC store (H2) | 3 tests: flag counts survive a new store instance; unknown domain → zero flags; `first_seen` stable across reflags |
+| `IocPersistenceTest` | feed flags across repository instances | 2 tests: a feed-flagged IOC surfaces through a fresh repository sharing the store; unknown domain stays clean |
+| `RateLimitFilterTest` | sliding-window rate limiter | 5 tests: requests within window pass; over-window → 429 + `Retry-After: 60`; clients limited independently; disabled filter never limits; `/actuator/health` exempt |
+| `FailClosedTest` | security fail-closed posture | 3 tests: protected endpoints 403 with no configured keys; presented key still 403; `/actuator/metrics` locked too |
+| `FeedHealthIndicatorTest` | feed health | 3 tests: disabled feed UP; enabled-but-never-refreshed DOWN; fresh refresh UP with IOC count |
 
-**Total: 78 tests, 0 failures.**
+**Total: 96 tests, 0 failures.** Line coverage 80.9%, branch 64.2% (JaCoCo).
 
 ## 3. Running
 
 ```bash
 # all tests
 mvn test
+
+# all tests + JaCoCo coverage gate (line ≥ 70%, branch ≥ 55%)
+mvn verify
 
 # single class
 mvn test -Dtest=SynapseEngineTest
@@ -46,7 +54,8 @@ mvn test -Dtest=SynapseEngineTest
 mvn package
 ```
 
-Reports land in `target/surefire-reports/`.
+Reports land in `target/surefire-reports/`; the JaCoCo report in
+`target/site/jacoco/index.html`.
 
 ## 4. Calibration tests worth highlighting
 
@@ -74,11 +83,19 @@ These encode the framework's key design decisions as regression guards:
 
 `.github/workflows/ci.yml` runs on every push/PR to `main`/`master`:
 
-1. Checkout, then Java 21 (Temurin) with a Maven dependency cache.
-2. `mvn test` — the full suite (PostgreSQL integration test runs via
-   Testcontainers; Docker is available on the runner).
-3. `mvn package -DskipTests` — verifies the runnable jar builds.
-4. On failure, `target/surefire-reports/**` is uploaded as an artifact.
+1. **`build` job** — checkout, Java 21 (Temurin) with a Maven dependency cache,
+   then `mvn verify` (the full suite **plus the JaCoCo coverage gate**), then
+   `mvn package -DskipTests`. On failure, `target/surefire-reports/**` is
+   uploaded; the JaCoCo report is uploaded regardless.
+2. **`smoke` job** — boots the packaged jar against a disposable PostgreSQL
+   container with the **live URLhaus feed enabled**, then exercises the API
+   (`/api/v1/dashboard`, `/api/v1/dns/evaluate`), checks `/actuator/health` is
+   `UP` and `/actuator/health/feed` reports the ingested IOC count. Catches
+   real-world feed format drift and wiring that unit tests cannot.
+3. **`security-scan.yml`** (weekly + on `pom.xml` changes) — Trivy filesystem
+   scan for HIGH/CRITICAL CVEs; fails the build on findings.
+4. **Dependabot** keeps `pom.xml` and the GitHub Actions up to date.
 
-Local equivalent: `mvn test`. H2 covers DB integration without a server;
-Docker is only needed for the PostgreSQL integration test.
+Local equivalent: `mvn verify`. H2 covers DB integration without a server;
+Docker is only needed for the PostgreSQL integration test (excluded locally
+via `-Dtest="!PostgresIntegrationTest"`).

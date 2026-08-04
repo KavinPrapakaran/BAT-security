@@ -12,6 +12,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Set;
 
 public class ApiKeyAuthFilter extends OncePerRequestFilter {
@@ -27,13 +29,28 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         String apiKey = extractApiKey(request);
-        if (apiKey != null && validApiKeys.contains(apiKey)) {
+        if (apiKey != null && isValid(apiKey)) {
             AbstractAuthenticationToken auth = new ApiKeyAuthentication(apiKey,
                     AuthorityUtils.createAuthorityList("ROLE_API"));
             auth.setAuthenticated(true);
             SecurityContextHolder.getContext().setAuthentication(auth);
         }
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * Constant-time comparison against every configured key so response timing
+     * does not leak key material. An empty key set fails everything closed.
+     */
+    private boolean isValid(String candidate) {
+        byte[] candidateBytes = candidate.getBytes(StandardCharsets.UTF_8);
+        for (String key : validApiKeys) {
+            byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
+            if (MessageDigest.isEqual(candidateBytes, keyBytes)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String extractApiKey(HttpServletRequest request) {

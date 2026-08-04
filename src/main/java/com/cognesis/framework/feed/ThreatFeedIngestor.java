@@ -1,10 +1,12 @@
 package com.cognesis.framework.feed;
 
 import com.cognesis.framework.dns.InMemoryDnsFactsRepository;
+import com.cognesis.framework.metrics.CognesisMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.client.RestClient;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 
@@ -21,13 +23,25 @@ public class ThreatFeedIngestor {
     private final RestClient restClient;
     private final InMemoryDnsFactsRepository factsRepository;
     private final String feedUrl;
+    private final CognesisMetrics metrics;
+
+    private volatile Instant lastRefreshAt;
+    private volatile int lastIngested;
 
     public ThreatFeedIngestor(RestClient restClient,
                               InMemoryDnsFactsRepository factsRepository,
                               String feedUrl) {
+        this(restClient, factsRepository, feedUrl, null);
+    }
+
+    public ThreatFeedIngestor(RestClient restClient,
+                              InMemoryDnsFactsRepository factsRepository,
+                              String feedUrl,
+                              CognesisMetrics metrics) {
         this.restClient = restClient;
         this.factsRepository = factsRepository;
         this.feedUrl = feedUrl;
+        this.metrics = metrics;
     }
 
     /** Pulls the feed and flags every domain line. Returns count ingested. */
@@ -56,11 +70,25 @@ public class ThreatFeedIngestor {
                     .distinct()
                     .toList();
             domains.forEach(factsRepository::flagMalicious);
+            lastRefreshAt = Instant.now();
+            lastIngested = domains.size();
+            if (metrics != null) {
+                metrics.recordFeedRefresh(domains.size());
+            }
             log.info("Threat feed refresh: {} IOCs ingested from {}", domains.size(), feedUrl);
             return domains.size();
         } catch (Exception e) {
+            lastRefreshAt = Instant.now();
             log.warn("Threat feed refresh failed (feed offline or unreachable): {}", e.getMessage());
             return 0;
         }
+    }
+
+    public Instant lastRefreshAt() {
+        return lastRefreshAt;
+    }
+
+    public int lastIngested() {
+        return lastIngested;
     }
 }

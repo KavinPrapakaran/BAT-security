@@ -17,6 +17,7 @@ public class CognesisProperties {
     private final Memory memory = new Memory();
     private final Dns dns = new Dns();
     private final Feed feed = new Feed();
+    private final Security security = new Security();
 
     public static class Algorithm {
         private Band band = new Band();
@@ -222,6 +223,7 @@ public class CognesisProperties {
         public static class Live {
             private boolean enabled = true;
             private String dohUrl = "https://cloudflare-dns.com/dns-query";
+            private String dohFallbackUrl = "https://dns.google/resolve";
             private String rdapUrl = "https://rdap.org/domain";
             private String crtUrl = "https://crt.sh";
             private int timeoutSeconds = 6;
@@ -241,6 +243,14 @@ public class CognesisProperties {
 
             public void setDohUrl(String dohUrl) {
                 this.dohUrl = dohUrl;
+            }
+
+            public String getDohFallbackUrl() {
+                return dohFallbackUrl;
+            }
+
+            public void setDohFallbackUrl(String dohFallbackUrl) {
+                this.dohFallbackUrl = dohFallbackUrl;
             }
 
             public String getRdapUrl() {
@@ -338,6 +348,7 @@ public class CognesisProperties {
         private String url = "";
         private int timeoutSeconds = 10;
         private boolean enabled = false;
+        private long refreshMinutes = 60;
 
         public String getUrl() {
             return url;
@@ -362,6 +373,58 @@ public class CognesisProperties {
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
         }
+
+        public long getRefreshMinutes() {
+            return refreshMinutes;
+        }
+
+        public void setRefreshMinutes(long refreshMinutes) {
+            this.refreshMinutes = refreshMinutes;
+        }
+    }
+
+    /**
+     * Access control and rate limiting. Deliberately no default API keys: the
+     * service is fail-closed (all protected endpoints return 401/403) until
+     * keys are provided via {@code COGNESIS_SECURITY_API_KEYS}.
+     */
+    public static class Security {
+        private String apiKeys = "";
+        private boolean rateLimitEnabled = true;
+        private int rateLimitPerMinute = 120;
+        private int rateLimitBurst = 60;
+
+        public String getApiKeys() {
+            return apiKeys;
+        }
+
+        public void setApiKeys(String apiKeys) {
+            this.apiKeys = apiKeys;
+        }
+
+        public boolean isRateLimitEnabled() {
+            return rateLimitEnabled;
+        }
+
+        public void setRateLimitEnabled(boolean rateLimitEnabled) {
+            this.rateLimitEnabled = rateLimitEnabled;
+        }
+
+        public int getRateLimitPerMinute() {
+            return rateLimitPerMinute;
+        }
+
+        public void setRateLimitPerMinute(int rateLimitPerMinute) {
+            this.rateLimitPerMinute = rateLimitPerMinute;
+        }
+
+        public int getRateLimitBurst() {
+            return rateLimitBurst;
+        }
+
+        public void setRateLimitBurst(int rateLimitBurst) {
+            this.rateLimitBurst = rateLimitBurst;
+        }
     }
 
     public Algorithm getAlgorithm() {
@@ -382,5 +445,9 @@ public class CognesisProperties {
 
     public Feed getFeed() {
         return feed;
+    }
+
+    public Security getSecurity() {
+        return security;
     }
 }

@@ -25,19 +25,32 @@ management:
 
 cognesis:
   security:
-    api-keys: cognesis-prod-key-1,cognesis-prod-key-2
+    api-keys: ""
+    rate-limit-enabled: true
+    rate-limit-per-minute: 120
+    rate-limit-burst: 60
   feed:
     enabled: true
     url: "https://urlhaus.abuse.ch/downloads/hostfile/"
     timeout-seconds: 10
+    refresh-minutes: 60
   dns:
     live:
       enabled: true
       doh-url: "https://cloudflare-dns.com/dns-query"
+      doh-fallback-url: "https://dns.google/resolve"
       rdap-url: "https://rdap.org/domain"
       crt-url: "https://crt.sh"
       timeout-seconds: 6
       cache-ttl-seconds: 300
+    weights:
+      evidence: 0.50
+      trust: 0.15
+      memory: 0.08
+      intent: 0.08
+      prediction: 0.05
+      deviation: 0.04
+    likelihood-weight: 0.70
   algorithm:
     band:
       monitor: 0.30
@@ -58,15 +71,6 @@ cognesis:
   memory:
     activation-decay: 0.02
     recall-limit: 20
-  dns:
-    weights:
-      evidence: 0.50
-      trust: 0.15
-      memory: 0.08
-      intent: 0.08
-      prediction: 0.05
-      deviation: 0.04
-    likelihood-weight: 0.70
 
 logging:
   level:

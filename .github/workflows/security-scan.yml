@@ -1,0 +1,40 @@
+name: Dependency CVE scan
+
+on:
+  schedule:
+    # Weekly scan of the published build for known vulnerabilities.
+    - cron: '23 3 * * 1'
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - pom.xml
+
+jobs:
+  scan:
+    name: Trivy CVE scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build runnable jar
+        run: mvn -B --no-transfer-progress package -DskipTests
+
+      - name: Scan filesystem for vulnerabilities
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          exit-code: '1'
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivy-config: .trivyignore.yaml
