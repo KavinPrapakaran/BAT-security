@@ -13,7 +13,7 @@
 
     <groupId>com.cognesis</groupId>
     <artifactId>cognesis-framework</artifactId>
-    <version>0.3.0-SNAPSHOT</version>
+    <version>1.0.0-SNAPSHOT</version>
     <name>COGNESIS Cognitive Security Decision Framework</name>
     <description>An analyst-inspired, modular cybersecurity decision framework: SYNAPSE decision algorithm, ACDE decision core, Fides trust engine, Mnemonic memory engine, and the Cognitive DNS Engine (CODE).</description>
 
@@ -37,6 +37,10 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>

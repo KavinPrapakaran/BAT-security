@@ -1,7 +1,7 @@
 # COGNESIS — Roadmap
 
 **Version plan:** v0.1.0 scaffold ✅ · v0.2.0 Cognitive Core ✅ · v0.3.0
-Persistence & Observability ✅ · v1.0.0 Stable (next).
+Persistence & Observability ✅ · v1.0.0 Stable ✅.
 
 ## 1. Done
 
@@ -58,10 +58,12 @@ Persistence & Observability ✅ · v1.0.0 Stable (next).
 - **Lore feedback endpoint**: `POST /api/v1/feedback` — accept decision feedback.
 - **54 tests green**, incl. validation, dashboard, lore-feedback, and DB schema.
 
-## 3. Next (v1.0.0 — Stable)
+## 3. Done (v1.0.0 — Stable)
 
-- **Authentication/authorisation** on the API (OAuth2 / mTLS) and API keys for
-  providers.
+- **API key authentication**: `X-API-Key` header or `Authorization: Bearer <key>` on
+  all `/api/v1/**` and `/actuator/**` endpoints (except `/actuator/health`).
+- Stateless, no sessions. Configurable keys via `cognesis.security.api-keys`.
+- **62 tests green**, incl. 8 security tests (auth filter, open/closed endpoints).
 
 ## 4. Later (framework growth)
 

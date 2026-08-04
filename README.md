@@ -34,10 +34,11 @@ src/main/java/com/cognesis/framework/
   persistence/       JDBC stores (decision log, trust profiles, memory graph)
   metrics/           Micrometer counters and timers
   validation/        input validation annotations & validators
+  security/          API key authentication filter
   config/            CognesisProperties + Spring wiring
   api/               REST controllers
 src/main/resources/  application.yml, db/schema-h2.sql, db/migration/
-src/test/java/       54 tests (unit + Spring context + H2 + validation)
+src/test/java/       62 tests (unit + Spring context + H2 + validation + security)
 ```
 
 ## Requirements
@@ -48,7 +49,7 @@ src/test/java/       54 tests (unit + Spring context + H2 + validation)
 ## Build & run
 
 ```bash
-mvn test          # 54 tests, all green
+mvn test          # 62 tests, all green
 mvn package       # runnable Spring Boot jar
 mvn spring-boot:run   # dev profile: in-memory H2, port 8080
 ```

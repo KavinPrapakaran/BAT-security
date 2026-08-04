@@ -24,6 +24,8 @@ management:
       enabled: true
 
 cognesis:
+  security:
+    api-keys: cognesis-prod-key-1,cognesis-prod-key-2
   algorithm:
     band:
       monitor: 0.30

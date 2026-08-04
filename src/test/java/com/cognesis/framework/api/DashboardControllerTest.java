@@ -18,7 +18,8 @@ class DashboardControllerTest {
 
     @Test
     void dashboardReturnsStatusAndWeights() throws Exception {
-        mockMvc.perform(get("/api/v1/dashboard"))
+        mockMvc.perform(get("/api/v1/dashboard")
+                        .header("Authorization", "Bearer cognesis-test-key-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.version").value("1.0.0"))
                 .andExpect(jsonPath("$.status").value("RUNNING"))

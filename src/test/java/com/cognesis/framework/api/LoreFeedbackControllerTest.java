@@ -31,6 +31,7 @@ class LoreFeedbackControllerTest {
                 """.formatted(UUID.randomUUID());
 
         mockMvc.perform(post("/api/v1/feedback")
+                        .header("Authorization", "Bearer cognesis-test-key-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isAccepted())
@@ -51,6 +52,7 @@ class LoreFeedbackControllerTest {
                 """.formatted(UUID.randomUUID());
 
         mockMvc.perform(post("/api/v1/feedback")
+                        .header("Authorization", "Bearer cognesis-test-key-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isAccepted())
