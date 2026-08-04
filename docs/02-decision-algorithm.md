@@ -104,22 +104,26 @@ confidence = Σ_j u_j · facet_j       u = {0.25, 0.20, 0.15, 0.15, 0.15, 0.10}
 
 ## 5. Decision bands
 
-`DecisionBandPolicy` maps risk to a band, applying **tolerance scaling** and a
-**low-confidence escalation** rule.
+`DecisionBandPolicy` maps risk to one of **seven** bands, applying **tolerance
+scaling** and a **low-confidence escalation** rule.
 
-| Band | Default upper bound | Meaning |
-|---|---|---|
-| ALLOW | `warn = 0.32` | normal; no action |
-| WARN | `monitor = 0.55` | noteworthy; watch |
-| MONITOR | `block = 0.80` | escalate; alert + containment prep |
-| BLOCK | `1.00` | intervene now |
+| Band | Default lower bound | Meaning | Example action |
+|---|---|---|---|
+| ALLOW | — | normal; no action | allow |
+| MONITOR | `0.30` | noteworthy; keep passive watch | monitor / rate-limit |
+| WARN | `0.45` | present a warning | warn + notify owner |
+| CHALLENGE | `0.58` | require verification | step-up MFA |
+| ESCALATE | `0.68` | hand to a human analyst | escalate / enrich |
+| ISOLATE | `0.82` | contain while staying observable | quarantine asset |
+| BLOCK | `0.92` | intervene now | block domain/IP |
 
 - **Tolerance**: a per-tenant or per-asset multiplier shifts the boundaries
   (highly tolerant environments tolerate higher risk before escalating).
 - **Escalate when uncertain**: if `confidence < lowConfidenceThreshold (0.25)`
-  the band is promoted one step (ALLOW→WARN, WARN→MONITOR) — when the framework
-  is unsure *and* risk is near a boundary, it errs toward caution but never
-  silently BLOCKs without evidence.
+  the band is promoted one step up the ladder (ALLOW→MONITOR→WARN→CHALLENGE→
+  ESCALATE→ISOLATE, capped at BLOCK) — when the framework is unsure *and* risk
+  is near a boundary, it errs toward caution but never silently BLOCKs without
+  evidence.
 
 ## 6. Pseudocode
 
@@ -140,14 +144,9 @@ function decide(input: SynapseInput, weights: SynapseWeights, bands: DecisionBan
     facets = [decisiveness(avg), 1−range, coverage, freshness, provenance, context]
     confidence = Σ u_j * facet_j
 
-    threshold = bands.monitor / bands.tolerance     # tolerance scaling
-    if risk < bands.warn:  band = ALLOW
-    elif risk < bands.monitor: band = WARN
-    elif risk < bands.block:  band = MONITOR
-    else: band = BLOCK
-
+    band = bands.mapRisk(risk, confidence)   # 7 bands, tolerance-scaled
     if confidence < bands.lowConfidenceThreshold:
-        band = promote(band)   # ALLOW→WARN, WARN→MONITOR
+        band = promote(band)   # one rung up the ladder, capped at BLOCK
 
     return SynapseDecision(risk, confidence, band, weights.used)
 ```

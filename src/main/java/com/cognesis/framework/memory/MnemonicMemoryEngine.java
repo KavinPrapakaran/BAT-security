@@ -1,5 +1,7 @@
 package com.cognesis.framework.memory;
 
+import com.cognesis.framework.common.DecisionResult;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -100,7 +102,7 @@ public class MnemonicMemoryEngine implements MemoryEngine {
         for (Map.Entry<String, List<String>> entry : incident.relations().entrySet()) {
             String relation = entry.getKey();
             for (String target : entry.getValue()) {
-                Node related = upsert(target, "RELATED", target, 0.5);
+                Node related = upsert(target, typeOf(target), target, 0.5);
                 Edge edge = subjectEdges.computeIfAbsent(target, k -> new Edge(target, relation, 0.0));
                 edge.weight = Math.min(1.0, edge.weight + incident.severity() * 0.3);
                 edge.lastObserved = incident.happenedAt();
@@ -112,6 +114,64 @@ public class MnemonicMemoryEngine implements MemoryEngine {
         }
         subject.baseWeight = Math.min(1.0, subject.baseWeight + incident.severity() * 0.2);
         subject.lastSeen = incident.happenedAt();
+    }
+
+    @Override
+    public void recordDecision(DecisionResult decision) {
+        String decisionKey = "decision:" + decision.decisionId();
+        Map<String, Object> props = new HashMap<>();
+        props.put("entityId", decision.entityId());
+        props.put("entityType", decision.entityType());
+        props.put("decision", decision.decision().name());
+        props.put("risk", decision.riskScore());
+        props.put("confidence", decision.confidenceScore());
+        props.put("rationale", decision.rationale());
+        props.put("chain", decision.reasoningChain().stream()
+                .map(s -> s.engine() + ": " + s.claim()).toList());
+
+        Node decisionNode = upsert(decisionKey, "DECISION", decisionKey, clamp(decision.riskScore()));
+        decisionNode.properties.putAll(props);
+        link(decision.entityId(), decision.entityType(), Relations.DECIDED_ON, decisionKey, decision.riskScore(),
+                decision.decidedAt());
+        decisionNode.baseWeight = Math.max(decisionNode.baseWeight, clamp(decision.riskScore()));
+    }
+
+    @Override
+    public void recordOutcome(String decisionId, double realizedRisk, boolean wasCorrect, String notes) {
+        String decisionKey = "decision:" + decisionId;
+        String outcomeKey = "outcome:" + decisionId;
+        Node outcomeNode = upsert(outcomeKey, "OUTCOME", outcomeKey, clamp(realizedRisk));
+        outcomeNode.properties.put("realizedRisk", realizedRisk);
+        outcomeNode.properties.put("wasCorrect", wasCorrect);
+        outcomeNode.properties.put("notes", notes);
+        link(decisionKey, "DECISION", Relations.OUTCOME_OF, outcomeKey, clamp(realizedRisk), Instant.now());
+    }
+
+    private void link(String fromKey, String fromType, String relation, String toKey,
+                      double weight, Instant at) {
+        Node from = upsert(fromKey, fromType, fromKey, Math.max(0.2, weight));
+        Map<String, Edge> fromEdges = adjacency.computeIfAbsent(from.key, k -> new ConcurrentHashMap<>());
+        Edge edge = fromEdges.computeIfAbsent(toKey, k -> new Edge(toKey, relation, 0.0));
+        edge.weight = Math.min(1.0, edge.weight + weight * 0.3);
+        edge.lastObserved = at;
+        Map<String, Edge> back = adjacency.computeIfAbsent(toKey, k -> new ConcurrentHashMap<>());
+        Edge reverse = back.computeIfAbsent(fromKey, k -> new Edge(fromKey, relation, 0.0));
+        reverse.weight = edge.weight;
+        reverse.lastObserved = at;
+    }
+
+    /** Infers an entity type from a "type:key" convention, e.g. ip:x, user:y, cert:z. */
+    private static String typeOf(String key) {
+        int idx = key.indexOf(':');
+        if (idx > 0) {
+            String prefix = key.substring(0, idx).toUpperCase();
+            return switch (prefix) {
+                case "IP", "DOMAIN", "CERT", "CERTIFICATE", "USER", "DEVICE", "HASH",
+                        "ACCOUNT", "EMAIL", "ATTACK", "TECHNIQUE", "DECISION", "OUTCOME" -> prefix.equals("CERT") ? "CERTIFICATE" : prefix;
+                default -> "RELATED";
+            };
+        }
+        return "RELATED";
     }
 
     @Override

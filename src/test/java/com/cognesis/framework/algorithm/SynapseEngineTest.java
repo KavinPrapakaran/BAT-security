@@ -18,9 +18,10 @@ class SynapseEngineTest {
     }
 
     @Test
-    void highEvidenceAndLowTrustBlocks() {
+    void highEvidenceAndLowTrustIsolateOrBlock() {
         SynapseDecision d = engine.evaluate(input(0.95, 0.1, 0.8), weights);
-        assertEquals(Decision.BLOCK, d.decision());
+        assertTrue(d.decision() == Decision.ISOLATE || d.decision() == Decision.BLOCK,
+                "high evidence + low trust must land in a containment band, got " + d.decision());
         assertTrue(d.riskScore() > 0.8);
         assertTrue(d.likelihoodScore() > 0.7);
     }
@@ -44,8 +45,8 @@ class SynapseEngineTest {
         SynapseInput uncertain = new SynapseInput(0.1, 0.5, 0.1, 0.1, 0.1, 0.5,
                 0.1, 0.1, 0.1, new EvidenceConfidence(0.2, 0.1, 0.1, 0.1));
         SynapseDecision d = engine.evaluate(uncertain, weights);
-        assertTrue(d.decision() == Decision.WARN || d.decision() == Decision.MONITOR,
-                "uncertain evidence should escalate past ALLOW, got " + d.decision());
+        assertTrue(d.decision() == Decision.CHALLENGE || d.decision() == Decision.ESCALATE,
+                "uncertain evidence should escalate up the ladder, got " + d.decision());
     }
 
     @Test
@@ -59,11 +60,14 @@ class SynapseEngineTest {
     }
 
     @Test
-    void decisionBandsAreOrdered() {
-        DecisionBandPolicy policy = new DecisionBandPolicy(0.3, 0.55, 0.8, 1.0, 0.2, false);
+    void sevenDecisionBandsAreOrdered() {
+        DecisionBandPolicy policy = DecisionBandPolicy.defaults();
         assertEquals(Decision.ALLOW, policy.mapRisk(0.1, 0.9));
-        assertEquals(Decision.WARN, policy.mapRisk(0.45, 0.9));
-        assertEquals(Decision.MONITOR, policy.mapRisk(0.65, 0.9));
-        assertEquals(Decision.BLOCK, policy.mapRisk(0.9, 0.9));
+        assertEquals(Decision.MONITOR, policy.mapRisk(0.35, 0.9));
+        assertEquals(Decision.WARN, policy.mapRisk(0.5, 0.9));
+        assertEquals(Decision.CHALLENGE, policy.mapRisk(0.6, 0.9));
+        assertEquals(Decision.ESCALATE, policy.mapRisk(0.7, 0.9));
+        assertEquals(Decision.ISOLATE, policy.mapRisk(0.85, 0.9));
+        assertEquals(Decision.BLOCK, policy.mapRisk(0.95, 0.9));
     }
 }

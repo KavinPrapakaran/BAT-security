@@ -1,7 +1,10 @@
 package com.cognesis.framework.config;
 
+import com.cognesis.framework.acde.AcdeEngine;
 import com.cognesis.framework.algorithm.SynapseEngine;
 import com.cognesis.framework.algorithm.SynapseWeights;
+import com.cognesis.framework.context.ContextEngine;
+import com.cognesis.framework.context.SituationalContextEngine;
 import com.cognesis.framework.dns.CognitiveDnsEngine;
 import com.cognesis.framework.dns.CognitiveDnsEngineImpl;
 import com.cognesis.framework.dns.DnsFactsRepository;
@@ -36,7 +39,6 @@ import com.cognesis.framework.memory.MnemonicMemoryEngine;
 import com.cognesis.framework.observatory.DnsEvidenceProvider;
 import com.cognesis.framework.observatory.EvidenceIngestor;
 import com.cognesis.framework.observatory.EvidenceProvider;
-import com.cognesis.framework.orchestrator.DecisionOrchestrator;
 import com.cognesis.framework.persistence.DecisionLogDao;
 import com.cognesis.framework.persistence.JdbcDecisionLogDao;
 import com.cognesis.framework.persistence.JdbcTrustProfileStore;
@@ -112,6 +114,11 @@ public class AppConfig {
     }
 
     @Bean
+    public ContextEngine contextEngine() {
+        return new SituationalContextEngine();
+    }
+
+    @Bean
     public RecommendationEngine recommendationEngine() {
         return new PactRecommendationEngine();
     }
@@ -181,41 +188,31 @@ public class AppConfig {
     @Bean
     public CognitiveDnsEngine cognitiveDnsEngine(DnsFactsRepository dnsFactsRepository,
                                                  List<DnsSignalAnalyzer> dnsSignalAnalyzers,
-                                                 TrustEngine trustEngine,
-                                                 MemoryEngine memoryEngine,
-                                                 PredictionEngine predictionEngine,
-                                                 IntentEngine intentEngine,
-                                                 ImpactEngine impactEngine,
-                                                 RecommendationEngine recommendationEngine,
-                                                 SynapseEngine synapseEngine,
-                                                 WeightStore weightStore,
-                                                 EvidenceIngestor evidenceIngestor,
-                                                 DecisionLogDao decisionLogDao,
-                                                 PolicyEvaluator policyEvaluator) {
-        return new CognitiveDnsEngineImpl(dnsFactsRepository, dnsSignalAnalyzers, trustEngine,
-                memoryEngine, predictionEngine, intentEngine, impactEngine, recommendationEngine,
-                synapseEngine, weightStore, evidenceIngestor, decisionLogDao, policyEvaluator);
+                                                 AcdeEngine acdeEngine) {
+        return new CognitiveDnsEngineImpl(dnsFactsRepository, dnsSignalAnalyzers, acdeEngine);
     }
 
     // ------------------------------------------------------------------
-    // Orchestrator
+    // ACDE - the single decision-maker
     // ------------------------------------------------------------------
 
     @Bean
-    public DecisionOrchestrator decisionOrchestrator(List<EvidenceProvider> evidenceProviders,
-                                                     EvidenceIngestor evidenceIngestor,
-                                                     TrustEngine trustEngine,
-                                                     MemoryEngine memoryEngine,
-                                                     PredictionEngine predictionEngine,
-                                                     IntentEngine intentEngine,
-                                                     ImpactEngine impactEngine,
-                                                     RecommendationEngine recommendationEngine,
-                                                     SynapseEngine synapseEngine,
-                                                     WeightStore weightStore,
-                                                     DecisionLogDao decisionLogDao) {
-        return new DecisionOrchestrator(evidenceProviders, evidenceIngestor, trustEngine, memoryEngine,
-                predictionEngine, intentEngine, impactEngine, recommendationEngine, synapseEngine,
-                weightStore, decisionLogDao);
+    public AcdeEngine acdeEngine(List<EvidenceProvider> evidenceProviders,
+                                 EvidenceIngestor evidenceIngestor,
+                                 TrustEngine trustEngine,
+                                 MemoryEngine memoryEngine,
+                                 ContextEngine contextEngine,
+                                 PredictionEngine predictionEngine,
+                                 IntentEngine intentEngine,
+                                 ImpactEngine impactEngine,
+                                 RecommendationEngine recommendationEngine,
+                                 SynapseEngine synapseEngine,
+                                 WeightStore weightStore,
+                                 DecisionLogDao decisionLogDao,
+                                 PolicyEvaluator policyEvaluator) {
+        return new AcdeEngine(evidenceProviders, evidenceIngestor, trustEngine, memoryEngine,
+                contextEngine, predictionEngine, intentEngine, impactEngine, recommendationEngine,
+                synapseEngine, weightStore, decisionLogDao, policyEvaluator);
     }
 
     @Bean

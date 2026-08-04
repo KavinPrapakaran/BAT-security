@@ -17,9 +17,12 @@ server:
 cognesis:
   algorithm:
     band:
-      warn: 0.32
-      monitor: 0.55
-      block: 0.80
+      monitor: 0.30
+      warn: 0.45
+      challenge: 0.58
+      escalate: 0.68
+      isolate: 0.82
+      block: 0.92
     low-confidence-threshold: 0.25
     escalate-when-uncertain: true
   trust:

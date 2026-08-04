@@ -1,4 +1,4 @@
-package com.cognesis.framework.orchestrator;
+package com.cognesis.framework.acde;
 
 import com.cognesis.framework.algorithm.DecisionBandPolicy;
 import com.cognesis.framework.algorithm.SynapseEngine;
@@ -7,6 +7,8 @@ import com.cognesis.framework.common.Decision;
 import com.cognesis.framework.common.DecisionResult;
 import com.cognesis.framework.common.EvidenceType;
 import com.cognesis.framework.common.Provenance;
+import com.cognesis.framework.context.ContextAssessment;
+import com.cognesis.framework.context.ContextEngine;
 import com.cognesis.framework.impact.ImpactAssessment;
 import com.cognesis.framework.intent.IntentAssessment;
 import com.cognesis.framework.learning.InMemoryWeightStore;
@@ -43,7 +45,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class DecisionOrchestratorTest {
+class AcdeEngineTest {
 
     @Mock
     private EvidenceProvider evidenceProvider;
@@ -51,6 +53,8 @@ class DecisionOrchestratorTest {
     private TrustEngine trustEngine;
     @Mock
     private MemoryEngine memoryEngine;
+    @Mock
+    private ContextEngine contextEngine;
     @Mock
     private PredictionEngine predictionEngine;
     @Mock
@@ -62,11 +66,11 @@ class DecisionOrchestratorTest {
     @Mock
     private DecisionLogDao decisionLogDao;
 
-    private DecisionOrchestrator orchestrator() {
-        return new DecisionOrchestrator(
+    private AcdeEngine acde() {
+        return new AcdeEngine(
                 List.of(evidenceProvider),
                 new EvidenceIngestor(),
-                trustEngine, memoryEngine, predictionEngine, intentEngine, impactEngine,
+                trustEngine, memoryEngine, contextEngine, predictionEngine, intentEngine, impactEngine,
                 recommendationEngine,
                 new SynapseEngine(DecisionBandPolicy.defaults()),
                 new InMemoryWeightStore(SynapseWeights.defaults()),
@@ -74,7 +78,7 @@ class DecisionOrchestratorTest {
     }
 
     @Test
-    void orchestratorAssemblesExplainableResult() {
+    void acdeAssemblesExplainableResult() {
         when(evidenceProvider.provide(any(EvidenceRequest.class))).thenReturn(List.of(
                 new EvidenceFragment("api-gw-7", "API", EvidenceType.API, 0.9, 0.9,
                         "credential stuffing pattern", Provenance.LIVE_TRAFFIC, Instant.now())));
@@ -84,6 +88,8 @@ class DecisionOrchestratorTest {
                 .thenReturn(new MemoryRecall(List.of(new MemoryItem("api-gw-7", "API", "api-gw-7",
                         0.7, 0.5, Instant.now(), Map.of())), Map.of()));
         when(memoryEngine.deviation(any(), any(), anyDouble())).thenReturn(0.6);
+        when(contextEngine.assess(any()))
+                .thenReturn(new ContextAssessment(0.5, 0.8, "api-call"));
         when(predictionEngine.predict(any(), anyDouble(), anyDouble()))
                 .thenReturn(new PredictionResult(0.7, 0.6, 1, "test-model"));
         when(intentEngine.assess(any()))
@@ -93,19 +99,23 @@ class DecisionOrchestratorTest {
         when(recommendationEngine.recommend(any(), anyDouble(), anyDouble(), any(), any()))
                 .thenReturn(new Recommendation(com.cognesis.framework.common.RecommendedAction.BLOCK_IP, "api-gw-7"));
 
-        DecisionResult result = orchestrator().evaluate(
+        DecisionResult result = acde().evaluate(
                 new DecisionRequest("api-gw-7", "API", "soc-analyst",
                         List.of("asset-billing"), "api-authentication", Map.of("geo", "anon")));
 
-        assertEquals(Decision.BLOCK, result.decision());
+        assertTrue(result.decision() == Decision.ISOLATE || result.decision() == Decision.BLOCK,
+                "strong adversarial evidence must land in a containment band, got " + result.decision());
         assertEquals("api-gw-7", result.entityId());
         assertTrue(result.riskScore() > 0.7);
-        assertTrue(result.reasoningChain().size() >= 8, "full chain expected");
-        assertTrue(result.reasoningChain().stream()
-                .anyMatch(s -> s.engine().equals("SYNAPSE")));
+        assertTrue(result.reasoningChain().size() >= 10, "full chain expected");
+        assertTrue(result.reasoningChain().stream().anyMatch(s -> s.engine().equals("SYNAPSE")));
+        assertTrue(result.reasoningChain().stream().anyMatch(s -> s.engine().equals("CONTEXT")),
+                "chain must include the CONTEXT engine");
 
         ArgumentCaptor<DecisionResult> captor = ArgumentCaptor.forClass(DecisionResult.class);
         verify(decisionLogDao).save(captor.capture());
         assertEquals(result.decisionId(), captor.getValue().decisionId());
+
+        verify(memoryEngine).recordDecision(result);
     }
 }

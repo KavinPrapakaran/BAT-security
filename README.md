@@ -23,18 +23,19 @@ src/main/java/com/cognesis/framework/
   dns/               CODE: Cognitive DNS Engine + 15 analyzers
   trust/             FIDES: dynamic asymmetric trust engine
   memory/            MNEMONIC: episodic knowledge graph + spreading activation
+  context/           CONTEXT: situational environment risk
   prediction/        SEER: near-future risk prediction
   intent/            MOTIVE: adversarial intent assessment
   impact/            RESOLVE: business impact scoring
   recommend/         PACT: recommended actions
   learning/          LORE: weight & baseline learning
   policy/            hard policy rule evaluation
-  orchestrator/      DecisionOrchestrator: full pipeline
+  acde/              ACDE: the single decision-maker (Cognitive Core)
   persistence/       JDBC stores (decision log, trust profiles)
   config/            CognesisProperties + Spring wiring
   api/               REST controllers
 src/main/resources/  application.yml, db/schema-h2.sql, db/schema-postgres.sql
-src/test/java/       31 tests (unit + Spring context + H2)
+src/test/java/       40 tests (unit + Spring context + H2)
 ```
 
 ## Requirements
@@ -45,7 +46,7 @@ src/test/java/       31 tests (unit + Spring context + H2)
 ## Build & run
 
 ```bash
-mvn test          # 31 tests, all green
+mvn test          # 40 tests, all green
 mvn package       # runnable Spring Boot jar
 mvn spring-boot:run   # dev profile: in-memory H2, port 8080
 ```
@@ -60,14 +61,14 @@ curl -s http://localhost:8080/api/v1/dns/evaluate \
   -d '{"domain":"paypa1.com","clientId":"alice","clientIp":"10.1.1.5"}'
 ```
 
-Evaluate any entity through the full pipeline:
+Evaluate any entity through the ACDE (the single decision-maker):
 
 ```bash
 curl -s http://localhost:8080/api/v1/decisions/evaluate \
   -H 'Content-Type: application/json' \
-  -d '{"entityId":"evil.example","entityType":"DOMAIN","clientId":"soc",
-       "assetIds":["asset-billing"],"context":"dns-resolution",
-       "metadata":{"env":"prod"}}'
+  -d '{"entityId":"evil.example","entityType":"DOMAIN","requestor":"soc",
+       "affectedAssetIds":["asset-billing"],"activity":"dns-resolution",
+       "context":{"env":"prod"}}'
 ```
 
 Full API reference: `docs/06-api.md`.
@@ -76,11 +77,12 @@ Full API reference: `docs/06-api.md`.
 
 | Engine | Role | Docs |
 |---|---|---|
+| **ACDE** | Adaptive Cognitive Decision Engine — the single decision-maker | `docs/01-architecture.md` |
 | **SYNAPSE** | Fuses evidence slices into a calibrated risk + decision band | `docs/02-decision-algorithm.md` |
-| **CODE** | Cognitive DNS Engine — 15 analyzers, hard policy override | `docs/03-dns-engine.md` |
+| **CODE** | Cognitive DNS Engine — 15 analyzers, feeds the ACDE | `docs/03-dns-engine.md` |
 | **MNEMONIC** | Episodic memory graph, spreading activation, baselines | `docs/04-memory-engine.md` |
 | **FIDES** | Asymmetric, decaying, explainable dynamic trust | `docs/05-trust-engine.md` |
-| Observatory / Seer / Motive / Resolve / Pact / Lore | supporting evidence & decision engines | `docs/01-architecture.md` |
+| Observatory / Context / Seer / Motive / Resolve / Pact / Lore | supporting evidence & decision engines | `docs/01-architecture.md` |
 
 ## Design documentation
 

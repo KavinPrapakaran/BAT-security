@@ -97,24 +97,38 @@ Each engine reads the same aggregated evidence and produces one **slice**:
 - Maintains behaviour baselines (Welford mean/variance) for Mnemonic deviation.
 - Runs batched; weights are clamped to `[w_min, w_max]` to stay explainable.
 
-## 4. The orchestrator
+## 4. The ACDE — one decision-maker
 
-`DecisionOrchestrator.evaluate()` runs the full pipeline for any entity type:
+**ACDE** (Adaptive Cognitive Decision Engine) is the single authority that
+decides. Every module (DNS, Email, API, Endpoint, Cloud, Identity, ...) is an
+*evidence provider*; none of them decide. ACDE collects their fragments,
+normalises each contribution, and runs one canonical reasoning chain:
 
 ```
-evidence       → aggregated slice
-fidesTrust     → trust slice        (persisted, keyed by entity id)
-memorySalience → memory slice
-prediction     → trend slice
-intent         → intent slice
-impact         → consequence slice
-synapse        → fused risk + band
-pact           → recommended action
-chain          → 8 reasoning steps (≥ 8 in tests)
+Evidence  → OBSERVATORY   aggregated strength + confidence of the evidence pool
+Trust     → FIDES         dynamic entity trust over observation history
+Context   → CONTEXT       situational environment risk + weight
+Intent    → MOTIVE        fused adversarial intent from the evidence families
+Prediction→ SEER          near-future risk from the entity's risk trend
+Impact    → RESOLVE       business value at risk
+Confidence→ SYNAPSE       fused risk + confidence (bands: Allow..Block)
+Action    → PACT          concrete recommended action
 ```
 
-The DNS engine adds three extra reasoning steps (deviation, synapse, pact) for a
-total chain of ≥ 10 steps when evaluating domains.
+`AcdeEngine.evaluate()`:
+
+- gathers evidence from every registered `EvidenceProvider`,
+- runs each reasoning engine and appends a `ReasoningStep` (the audit trail),
+- fuses the slices with SYNAPSE into one of **seven** bands,
+- short-circuits on hard **policy** rules (block-list → BLOCK, risk=conf=1.0),
+- persists the decision to the decision log,
+- stores the full reasoning path in MNEMONIC via `recordDecision` (so future
+  recalls can answer "we decided X about this entity, and here is why"),
+- records the risk in SEER for trend learning.
+
+The DNS engine (CODE) is one consumer: it runs its senses and hands the
+resulting evidence fragments to the ACDE, which yields a total chain of
+≥ 10 steps when evaluating domains.
 
 ## 5. Integration points
 

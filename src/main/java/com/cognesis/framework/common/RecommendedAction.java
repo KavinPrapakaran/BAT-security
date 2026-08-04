@@ -6,16 +6,24 @@ package com.cognesis.framework.common;
  * (firewall, EDR, identity provider, analyst queue, etc.).
  */
 public enum RecommendedAction {
+    NONE,
     ALLOW,
     ALERT_ONLY,
+    MONITOR_ONGOING,
+    WARN_NOTIFY,
+    CHALLENGE_VERIFY,
+    REQUIRE_MFA,
     ESCALATE_TO_ANALYST,
     ENRICH_INTELLIGENCE,
     INCREASE_MONITORING,
-    REQUIRE_MFA,
+    RATE_LIMIT,
+    QUARANTINE_DOMAIN,
+    QUARANTINE_IP,
+    SUSPEND_ACCOUNT,
     QUARANTINE_ENDPOINT,
+    ISOLATE_ASSET,
     BLOCK_DOMAIN,
     BLOCK_IP,
     BLOCK_USER,
-    REVOKE_CERTIFICATE,
-    ISOLATE_ASSET
+    REVOKE_CERTIFICATE
 }

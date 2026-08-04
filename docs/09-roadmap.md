@@ -1,7 +1,12 @@
 # COGNESIS — Roadmap
 
-## 1. Done (reference scaffold, this repository)
+**Version plan:** v0.1.0 scaffold ✅ · v0.2.0 Cognitive Core ✅ · v0.3.0 Cognitive
+DNS · v0.4.0 Prediction & Learning · v0.5.0 Enterprise Dashboard · v0.6.0
+Performance · v1.0.0 Stable.
 
+## 1. Done
+
+### v0.1.0 — reference scaffold
 - **SYNAPSE** decision algorithm: log-odds fusion, impact blend, confidence
   facets, decision bands, tolerance + low-confidence escalation.
 - **Observatory**: evidence model, aggregation with dominant-signal rule,
@@ -15,15 +20,35 @@
   recommendation, and weight-learning engines.
 - **REST API** (`/api/v1/decisions`, `/dns`, `/trust`, `/memory`, `/evidence`).
 - **Persistence**: H2 (dev) + PostgreSQL schema, JDBC stores, decision audit log.
-- **Tests**: 31 green, incl. full Spring context smoke test.
 - Build: `mvn package` produces a runnable Spring Boot jar.
 
-## 2. Next (hardening)
+### v0.2.0 — Cognitive Core (ACDE)
+- **ACDE** (`acde/`): the single decision-maker. All engines (DNS, and future
+  Identity/Email/Endpoint/Cloud) are evidence providers; only the ACDE decides.
+- **Seven decision bands**: ALLOW · MONITOR · WARN · CHALLENGE · ESCALATE ·
+  ISOLATE · BLOCK, with a matching recommended-action vocabulary.
+- **Canonical reasoning chain** — Evidence → Trust → Context → Intent →
+  Prediction → Business Impact → Confidence/Decision → Action.
+- **Context engine** (`context/`): situational environment risk and weight
+  (prod vs dev, anonymised sources, activity type).
+- **Cyber memory with relationships** (`memory/Relations.java`): Domain↔IP
+  (RESOLVES_TO), Domain↔Certificate (HAS_CERTIFICATE), User↔Device (USED_BY),
+  Attack↔Technique (USES_TECHNIQUE), Decision↔Outcome (DECIDED_ON, OUTCOME_OF).
+- **Decision memory**: `recordDecision` stores every decision with its full
+  reasoning path as a DECISION node; `recordOutcome` closes the loop.
+- **Trust evolution**: semantic events (`TrustEvent.Events`) — certificate
+  change, DNS change, suspicious behaviour, confirmed compromise — drive the
+  95 → 62 → 8 style collapse of a previously-trusted entity.
+- **CODE refactored** to consume the ACDE (it sees, the ACDE decides).
+- **Tests**: 40 green, incl. ACDE, context, trust-evolution and decision-memory
+  suites plus the Spring context smoke test.
+
+## 2. Next (v0.3.0 — Cognitive DNS)
 
 - **PostgreSQL integration tests** against a real instance (Testcontainers),
   switching schema init to Flyway migrations.
 - **Persistence for Mnemonic graph + Seer trends** (memory_node/memory_edge
-  warm-cache load/save).
+  warm-cache load/save) and for decision/outcome nodes.
 - **Lore online learning loop**: consume `outcome_feedback` rows, batch-update
   Synapse weights with audit trail (before/after weights in `decision_log`).
 - **Actuator/observability** hardening: decision-rate metrics, engine latency
@@ -48,7 +73,7 @@
 - **VOID — Email engine**: evaluates inbound message risk before delivery.
 - **SENTRY — Endpoint engine**: evaluates process/host risk.
 
-Each is a new `*Engine` + providers + analyzers plugged into the orchestrator;
+Each is a new `*Engine` + providers + analyzers feeding the ACDE;
 SYNAPSE and the reasoning-chain format are unchanged.
 
 ### Scale & productisation

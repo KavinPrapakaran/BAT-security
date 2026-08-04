@@ -9,7 +9,8 @@ the requested domain before answering.
 
 Implemented in `dns/*`:
 
-- `CognitiveDnsEngineImpl` — the orchestrating engine.
+- `CognitiveDnsEngineImpl` — the ACDE-facing engine: it collects DNS evidence
+  fragments and asks the **ACDE** (`acde/AcdeEngine`) to decide.
 - `DnsSignalAnalyzer` (interface) + **15 analyzers** in `dns/analyzer/`.
 - `DnsFacts` / `DnsFactsRepository` (in-memory facts store) and `DnsSignal`.
 - `DnsDecision` — the verdict, reusing the framework `DecisionResult` shape.
@@ -152,8 +153,9 @@ See `docs/06-api.md` for full payloads.
 ## 8. Why a DNS engine?
 
 DNS is the first network touch of almost every attack — phishing, C2, DGA,
-exfiltration, typosquatting. A *decision* at resolution time (allow / warn /
-block) is the cheapest, least-disruptive place to intervene. CODE is designed to
+exfiltration, typosquatting. A *decision* at resolution time (allow / monitor /
+warn / challenge / escalate / isolate / block) is the cheapest, least-disruptive
+place to intervene. CODE is designed to
 run inline in a DNS proxy/resolver or as a pre-resolution check API.
 
 ## 9. Extending

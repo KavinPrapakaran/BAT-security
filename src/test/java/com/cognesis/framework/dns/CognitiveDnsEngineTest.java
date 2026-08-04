@@ -1,9 +1,12 @@
 package com.cognesis.framework.dns;
 
+import com.cognesis.framework.acde.AcdeEngine;
 import com.cognesis.framework.algorithm.DecisionBandPolicy;
 import com.cognesis.framework.algorithm.SynapseEngine;
+import com.cognesis.framework.algorithm.SynapseWeights;
 import com.cognesis.framework.common.Decision;
 import com.cognesis.framework.common.ReasoningStep;
+import com.cognesis.framework.context.SituationalContextEngine;
 import com.cognesis.framework.dns.analyzer.DomainAgeAnalyzer;
 import com.cognesis.framework.impact.InMemoryAssetRegistry;
 import com.cognesis.framework.impact.ResolveImpactEngine;
@@ -34,30 +37,35 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CognitiveDnsEngineTest {
 
     private CognitiveDnsEngine engine;
-    private TrustEngine trustEngine;
 
     @BeforeEach
     void setUp() {
-        trustEngine = new FidesTrustEngine(TrustProperties.defaults());
+        TrustEngine trustEngine = new FidesTrustEngine(TrustProperties.defaults());
         MemoryEngine memoryEngine = new MnemonicMemoryEngine(0.02, 20);
 
         // Fides learns that long-lived well-known domains are trustworthy.
-        trustEngine.recordEvent(new TrustEvent("google.com", TrustEvent.EventType.POSITIVE, 0.9, "long history"));
-        trustEngine.recordEvent(new TrustEvent("google.com", TrustEvent.EventType.POSITIVE, 0.8, "validated brand"));
+        // Deep history: a genuinely well-established brand sits well above neutral.
+        for (int i = 0; i < 30; i++) {
+            trustEngine.recordEvent(new TrustEvent("google.com", TrustEvent.EventType.POSITIVE, 0.9, "steady history"));
+        }
         trustEngine.recordEvent(new TrustEvent("corp.example.com", TrustEvent.EventType.POSITIVE, 0.9, "corporate zone"));
 
         PolicyEvaluator policy = new InMemoryPolicyEvaluator(List.of(
                 new PolicyRule("malware blocklist", "BLOCK_LIST", "example-malware.test", "BLOCK", 10)));
 
+        AcdeEngine acde = new AcdeEngine(
+                List.of(), new EvidenceIngestor(), trustEngine, memoryEngine,
+                new SituationalContextEngine(), new SeerPredictionEngine(), new MotiveIntentEngine(),
+                new ResolveImpactEngine(new InMemoryAssetRegistry()), new PactRecommendationEngine(),
+                new SynapseEngine(DecisionBandPolicy.defaults()),
+                new InMemoryWeightStore(SynapseWeights.defaults()),
+                new DecisionLogDao() {
+                }, policy);
+
         engine = new CognitiveDnsEngineImpl(
                 new InMemoryDnsFactsRepository(),
                 List.of(new DomainAgeAnalyzer()),
-                trustEngine, memoryEngine, new SeerPredictionEngine(), new MotiveIntentEngine(),
-                new ResolveImpactEngine(new InMemoryAssetRegistry()), new PactRecommendationEngine(),
-                new SynapseEngine(DecisionBandPolicy.defaults()),
-                new InMemoryWeightStore(com.cognesis.framework.algorithm.SynapseWeights.defaults()),
-                new EvidenceIngestor(), new DecisionLogDao() {
-                }, policy);
+                acde);
     }
 
     @Test
@@ -91,6 +99,7 @@ class CognitiveDnsEngineTest {
                 .map(ReasoningStep::engine).toList();
         assertTrue(engines.stream().anyMatch(e -> e.startsWith("CODE:")), "must include DNS senses");
         assertTrue(engines.contains("FIDES"), "must include trust reasoning");
+        assertTrue(engines.contains("CONTEXT"), "must include environment reasoning");
         assertTrue(engines.contains("SYNAPSE"), "must include fused decision");
         assertTrue(engines.contains("PACT"), "must include recommendation");
     }

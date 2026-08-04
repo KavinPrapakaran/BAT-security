@@ -55,16 +55,16 @@ General-purpose decision for any entity type.
 {
   "entityId": "paypa1.com",
   "entityType": "DOMAIN",
-  "clientId": "soc",
-  "assetIds": ["asset-billing"],
-  "context": "dns-resolution",
-  "metadata": { "env": "prod" }
+  "requestor": "soc",
+  "affectedAssetIds": ["asset-billing"],
+  "activity": "dns-resolution",
+  "context": { "env": "prod" }
 }
 ```
 
 Response: `DecisionResult` (same shape as `outcome` above), with a reasoning
-chain of ≥ 8 steps: OBSERVATORY, FIDES, MNEMONIC, SEER, MOTIVE, RESOLVE,
-SYNAPSE, PACT.
+chain of ≥ 10 steps: OBSERVATORY, FIDES, MNEMONIC (salience), MNEMONIC
+(deviation), CONTEXT, MOTIVE, SEER, RESOLVE, SYNAPSE, PACT.
 
 ## 3. Trust management
 
@@ -114,8 +114,8 @@ Applies the weighted-mean + dominant-signal aggregation described in
 
 | Concept | Values |
 |---|---|
-| `Decision` | `ALLOW`, `WARN`, `MONITOR`, `BLOCK` |
-| `RecommendedAction` | `NONE`, `WATCH`, `RATE_LIMIT`, `QUARANTINE_DOMAIN`, `QUARANTINE_IP`, `SUSPEND_ACCOUNT`, `BLOCK_DOMAIN`, `ISOLATE_HOST`, `ESCALATE_HUMAN` |
+| `Decision` | `ALLOW`, `MONITOR`, `WARN`, `CHALLENGE`, `ESCALATE`, `ISOLATE`, `BLOCK` |
+| `RecommendedAction` | `NONE`, `ALLOW`, `ALERT_ONLY`, `MONITOR_ONGOING`, `WARN_NOTIFY`, `CHALLENGE_VERIFY`, `REQUIRE_MFA`, `ESCALATE_TO_ANALYST`, `ENRICH_INTELLIGENCE`, `INCREASE_MONITORING`, `RATE_LIMIT`, `QUARANTINE_DOMAIN`, `QUARANTINE_IP`, `QUARANTINE_ENDPOINT`, `SUSPEND_ACCOUNT`, `ISOLATE_ASSET`, `BLOCK_DOMAIN`, `BLOCK_IP`, `BLOCK_USER`, `REVOKE_CERTIFICATE` |
 | `EvidenceType` | `DNS_AGE`, `DNS_REGISTRAR`, `DNS_DNSSEC`, `DNS_FAST_FLUX`, `DNS_DGA`, `DNS_HOMOGRAPH`, `DNS_TYPOSQUAT`, `DNS_SUBDOMAIN`, `DNS_CT`, `DNS_WHOIS`, `DNS_HIST_TRUST`, `DNS_THREAT_MEM`, `DNS_POLICY`, `DNS_USER_BEHAV`, `DNS_NET_BEHAV`, `NETWORK_REPUTATION`, `FILE_REPUTATION`, `AUTH_ANOMALY`, `EMAIL_REPUTATION`, `API_ABUSE`, ... |
 | `Provenance` | `DNS_RESPONSE`, `NETWORK_FLOW`, `ENDPOINT_TELEMETRY`, `AUTH_LOG`, `EMAIL_GATEWAY`, `THREAT_INTEL`, `API_GATEWAY`, ... |
 
@@ -125,7 +125,7 @@ Applies the weighted-mean + dominant-signal aggregation described in
 cognesis:
   synapse:
     weights: { evidence: 0.50, trust: 0.15, memory: 0.08, intent: 0.08, prediction: 0.05, deviation: 0.04, impact: 0.70 }
-    bands: { warn: 0.32, monitor: 0.55, block: 0.80, tolerance: 1.0, lowConfidenceThreshold: 0.25, escalateWhenUncertain: true }
+    bands: { monitor: 0.30, warn: 0.45, challenge: 0.58, escalate: 0.68, isolate: 0.82, block: 0.92, tolerance: 1.0, lowConfidenceThreshold: 0.25, escalateWhenUncertain: true }
   trust:
     positive-gain: 0.15
     negative-gain: 0.35

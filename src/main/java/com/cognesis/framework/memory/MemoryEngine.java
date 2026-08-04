@@ -1,9 +1,11 @@
 package com.cognesis.framework.memory;
 
+import com.cognesis.framework.common.DecisionResult;
+
 /**
- * MNEMONIC - the cyber memory engine. It remembers entities, attacks, decisions
- * and relationships as a time-decaying knowledge graph, and it maintains
- * behavioural baselines so future reasoning can quantify deviation.
+ * MNEMONIC - the cyber memory engine. It remembers entities, attacks, decisions,
+ * outcomes and their relationships as a time-decaying knowledge graph, and it
+ * maintains behavioural baselines so future reasoning can quantify deviation.
  */
 public interface MemoryEngine {
 
@@ -21,4 +23,18 @@ public interface MemoryEngine {
 
     /** Feed a behavioural observation into the baseline. */
     void observeBehaviour(String entityId, String featureName, double value);
+
+    /**
+     * Store a decision and its full reasoning path in memory: a DECISION node
+     * linked to the entity via DECIDED_ON, so future recalls can surface "we
+     * decided X about this entity, and here is why".
+     */
+    void recordDecision(DecisionResult decision);
+
+    /**
+     * Close the loop on a past decision: link the DECISION node to an OUTCOME
+     * node (realized risk, correctness) via OUTCOME_OF, enabling
+     * decision-vs-outcome reasoning.
+     */
+    void recordOutcome(String decisionId, double realizedRisk, boolean wasCorrect, String notes);
 }

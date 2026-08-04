@@ -45,7 +45,8 @@ is described by a vector of **evidence slices**, each produced by an *engine*:
 5. **Motive (Intent)** — what is the *most likely adversarial intent*?
 6. **Resolve (Impact)** — what is at stake if this entity is malicious?
 7. **Synapse (Decision)** — fuses all of the above into a calibrated risk score,
-   a decision band (ALLOW / WARN / MONITOR / BLOCK), and a recommended action.
+    a decision band (ALLOW / MONITOR / WARN / CHALLENGE / ESCALATE / ISOLATE /
+    BLOCK), and a recommended action.
 8. **Pact (Recommendation)** — turns the decision band into concrete, safe action
    suggestions.
 9. **Lore (Learning)** — closes the loop: outcomes of past decisions adjust the
@@ -77,8 +78,8 @@ persisted with each decision (`decision_log.reasoning_chain`).
    contribution, not a wrapper around an existing product.
 2. **Modular by construction.** A new source of evidence (e.g. an email gateway)
    is a new *analyzer/provider* that plugs into Observatory; a new decision
-   domain (e.g. identity) is a new *engine* that plugs into the orchestrator.
-   No core redesign.
+   domain (e.g. identity) is a new *engine* that feeds the ACDE. No core
+   redesign.
 3. **Everything is a number in [0,1].** All signals, trust values, memory
    saliences, impacts, and risk scores are calibrated probabilities/severities in
    `[0,1]`, so fusion is well-defined and monotonic in each input.
@@ -97,17 +98,18 @@ A working scaffold exists in this repository:
 - Storage: **H2 (in-memory, PostgreSQL mode)** for dev/test; **PostgreSQL**
   schema shipped for production.
 - API: REST at `/api/v1/**` (see `docs/06-api.md`).
-- Tests: 31 tests, all green (`mvn test`), including a full Spring context
+- Tests: 40 tests, all green (`mvn test`), including a full Spring context
   smoke test against H2.
 
 Engine | Code | Tests
 ---|---|---
+ACDE (single decision-maker) | `acde/AcdeEngine` | 1
 SYNAPSE decision | `algorithm/SynapseEngine` | 6
 Observatory | `observatory/*` | (via DNS)
 CODE (Cognitive DNS Engine) | `dns/*` + 15 analyzers | 12
-Mnemonic memory | `memory/MnemonicMemoryEngine` | 5
-Fides trust | `trust/FidesTrustEngine` | 4
-Orchestrator (full chain) | `orchestrator/DecisionOrchestrator` | 1
+Mnemonic memory | `memory/MnemonicMemoryEngine` | 8
+Fides trust | `trust/FidesTrustEngine` | 6
+Context | `context/SituationalContextEngine` | 4
 Spring boot wiring + H2 | `CognesisApplication` + config | 3
 
 ## 6. Terminology glossary
@@ -117,7 +119,7 @@ Spring boot wiring + H2 | `CognesisApplication` + config | 3
 | Entity | Decision target (domain, IP, account, host, asset...). |
 | Evidence | Any observed fact about an entity, with strength & confidence. |
 | Engine | A named, independent reasoning module. |
-| Decision band | ALLOW / WARN / MONITOR / BLOCK. |
+| Decision band | ALLOW / MONITOR / WARN / CHALLENGE / ESCALATE / ISOLATE / BLOCK. |
 | Risk score | Fused severity in [0,1]; the output of SYNAPSE. |
 | Reasoning chain | Ordered, auditable list of engine claims. |
 | Salience | Memory activation strength of an entity. |

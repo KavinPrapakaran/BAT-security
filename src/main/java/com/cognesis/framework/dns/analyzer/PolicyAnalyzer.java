@@ -30,6 +30,12 @@ public class PolicyAnalyzer implements DnsSignalAnalyzer {
         return switch (verdict.decision()) {
             case BLOCK -> new DnsSignal(EvidenceType.POLICY, 1.0, 1.0,
                     "Policy block: " + verdict.matchedRules(), Provenance.POLICY_ANNOTATION);
+            case ISOLATE -> new DnsSignal(EvidenceType.POLICY, 0.82, 0.9,
+                    "Policy isolate: " + verdict.matchedRules(), Provenance.POLICY_ANNOTATION);
+            case ESCALATE -> new DnsSignal(EvidenceType.POLICY, 0.68, 0.9,
+                    "Policy escalate: " + verdict.matchedRules(), Provenance.POLICY_ANNOTATION);
+            case CHALLENGE -> new DnsSignal(EvidenceType.POLICY, 0.58, 0.9,
+                    "Policy challenge: " + verdict.matchedRules(), Provenance.POLICY_ANNOTATION);
             case MONITOR -> new DnsSignal(EvidenceType.POLICY, 0.55, 0.9,
                     "Policy monitor: " + verdict.matchedRules(), Provenance.POLICY_ANNOTATION);
             case WARN -> new DnsSignal(EvidenceType.POLICY, 0.45, 0.9,

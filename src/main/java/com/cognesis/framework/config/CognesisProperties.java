@@ -47,14 +47,26 @@ public class CognesisProperties {
         }
 
         public DecisionBandPolicy toBandPolicy() {
-            return new DecisionBandPolicy(band.getWarn(), band.getMonitor(), band.getBlock(),
+            return new DecisionBandPolicy(band.getMonitor(), band.getWarn(), band.getChallenge(),
+                    band.getEscalate(), band.getIsolate(), band.getBlock(),
                     1.0, lowConfidenceThreshold, escalateWhenUncertain);
         }
 
         public static class Band {
-            private double warn = 0.32;
-            private double monitor = 0.55;
-            private double block = 0.80;
+            private double monitor = 0.30;
+            private double warn = 0.45;
+            private double challenge = 0.58;
+            private double escalate = 0.68;
+            private double isolate = 0.82;
+            private double block = 0.92;
+
+            public double getMonitor() {
+                return monitor;
+            }
+
+            public void setMonitor(double monitor) {
+                this.monitor = monitor;
+            }
 
             public double getWarn() {
                 return warn;
@@ -64,12 +76,28 @@ public class CognesisProperties {
                 this.warn = warn;
             }
 
-            public double getMonitor() {
-                return monitor;
+            public double getChallenge() {
+                return challenge;
             }
 
-            public void setMonitor(double monitor) {
-                this.monitor = monitor;
+            public void setChallenge(double challenge) {
+                this.challenge = challenge;
+            }
+
+            public double getEscalate() {
+                return escalate;
+            }
+
+            public void setEscalate(double escalate) {
+                this.escalate = escalate;
+            }
+
+            public double getIsolate() {
+                return isolate;
+            }
+
+            public void setIsolate(double isolate) {
+                this.isolate = isolate;
             }
 
             public double getBlock() {

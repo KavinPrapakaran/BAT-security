@@ -1,10 +1,10 @@
 package com.cognesis.framework;
 
+import com.cognesis.framework.acde.AcdeEngine;
+import com.cognesis.framework.acde.DecisionRequest;
 import com.cognesis.framework.dns.CognitiveDnsEngine;
 import com.cognesis.framework.dns.DnsDecision;
 import com.cognesis.framework.dns.DnsResolutionRequest;
-import com.cognesis.framework.orchestrator.DecisionOrchestrator;
-import com.cognesis.framework.orchestrator.DecisionRequest;
 import com.cognesis.framework.persistence.JdbcDecisionLogDao;
 import com.cognesis.framework.persistence.JdbcTrustProfileStore;
 import org.junit.jupiter.api.Test;
@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Full-context smoke test: boots the whole Spring wiring against the in-memory
- * H2 database and exercises the DNS engine and orchestrator end to end.
+ * H2 database and exercises the DNS engine and the ACDE end to end.
  */
 @SpringBootTest
 class CognesisApplicationTests {
@@ -26,7 +26,7 @@ class CognesisApplicationTests {
     private CognitiveDnsEngine dnsEngine;
 
     @Autowired
-    private DecisionOrchestrator orchestrator;
+    private AcdeEngine acde;
 
     @Autowired
     private JdbcDecisionLogDao decisionLogDao;
@@ -37,7 +37,7 @@ class CognesisApplicationTests {
     @Test
     void contextLoads() {
         assertNotNull(dnsEngine);
-        assertNotNull(orchestrator);
+        assertNotNull(acde);
         assertNotNull(decisionLogDao);
         assertNotNull(trustProfileStore);
     }
@@ -51,12 +51,13 @@ class CognesisApplicationTests {
     }
 
     @Test
-    void orchestratorRunsThroughThePipeline() {
-        var result = orchestrator.evaluate(
+    void acdeRunsThroughThePipeline() {
+        var result = acde.evaluate(
                 new DecisionRequest("paypa1.com", "DOMAIN", "soc", java.util.List.of("asset-billing"),
                         "dns-resolution", java.util.Map.of("env", "prod")));
         assertNotNull(result.decision());
         assertTrue(result.riskScore() >= 0.0 && result.riskScore() <= 1.0);
         assertEquals("paypa1.com", result.entityId());
+        assertTrue(result.reasoningChain().size() >= 10);
     }
 }

@@ -1,19 +1,19 @@
-package com.cognesis.framework.orchestrator;
+package com.cognesis.framework.acde;
 
 import java.util.List;
 import java.util.Map;
 
 /**
- * A general-purpose decision request handled by the orchestrator. Any entity
- * type (DOMAIN, IP, USER, DEVICE, API, EMAIL, ...) can be evaluated as long as
- * an evidence provider exists for it.
+ * A general-purpose decision request handled by the ACDE. Any entity type
+ * (DOMAIN, IP, USER, DEVICE, API, EMAIL, ...) can be evaluated as long as an
+ * evidence provider exists for it.
  *
  * @param entityId         entity under evaluation
  * @param entityType       entity type
  * @param requestor        principal requesting the decision
  * @param affectedAssetIds assets that could be affected
- * @param activity         what is being attempted
- * @param context          free-form situational context
+ * @param activity         what is being attempted (also feeds the CONTEXT engine)
+ * @param context          free-form situational context (metadata)
  */
 public record DecisionRequest(
         String entityId,
