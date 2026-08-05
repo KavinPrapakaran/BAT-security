@@ -70,19 +70,46 @@ public class SecurityKnowledgeGraph implements ActgGraph {
         });
     }
 
+    /**
+     * Restores an edge at an explicit weight (persistence reload path). Unlike
+     * {@link #recordAssociation(String, ActgEntityType, String, ActgEntityType,
+     * ActgRelation)} this does not strengthen the edge; the stored weight is
+     * reproduced exactly so a graph reloaded from the database is identical to
+     * the graph that wrote it.
+     */
+    public void recordAssociation(String sourceKey, ActgEntityType sourceType,
+                                  String targetKey, ActgEntityType targetType,
+                                  ActgRelation relation, double weight) {
+        recordObservation(sourceKey, sourceType, 0.0);
+        recordObservation(targetKey, targetType, 0.0);
+        EdgeKey key = new EdgeKey(sourceKey, targetKey, relation);
+        edges.compute(key, (k, state) -> {
+            EdgeState s = state != null ? state : new EdgeState();
+            s.weight = Math.max(0.5, Math.min(3.0, weight));
+            s.observedAt = Instant.now();
+            return s;
+        });
+    }
+
     @Override
     public void recordObservation(String key, ActgEntityType entityType, double risk) {
+        recordObservation(key, entityType, risk, Instant.now());
+    }
+
+    /** Restores a node with its persisted last-seen time (reload path). */
+    public void recordObservation(String key, ActgEntityType entityType, double risk, Instant lastSeen) {
         double clamped = Math.max(0.0, Math.min(MAX_NODE_RISK, risk));
         nodes.compute(key, (k, existing) -> {
             if (existing == null) {
                 return new ActgNode(k, entityType, entityType.name().toLowerCase(), clamped,
-                        Instant.now(), Map.of());
+                        lastSeen != null ? lastSeen : Instant.now(), Map.of());
             }
             // Risk is a high-water mark: it ratchets up with each bad
             // observation and never silently erases history, so a clean
             // domain sitting next to a dirty node stays flagged.
             double merged = Math.max(existing.risk(), clamped);
-            return new ActgNode(k, entityType, existing.label(), merged, Instant.now(), existing.properties());
+            return new ActgNode(k, entityType, existing.label(), merged,
+                    lastSeen != null ? lastSeen : Instant.now(), existing.properties());
         });
     }
 

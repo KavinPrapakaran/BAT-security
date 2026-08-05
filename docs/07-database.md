@@ -4,7 +4,7 @@ Two schema sources ship in `src/main/resources/db/`:
 
 - **`schema-h2.sql`** — dev/test, run by Spring Boot on the in-memory H2
   database configured with `MODE=PostgreSQL`. Mirrors the production schema.
-- **Flyway migrations (`db/migration/V1..V5`)** — authoritative production DDL
+- **Flyway migrations (`db/migration/V1..V6`)** — authoritative production DDL
   (TIMESTAMPTZ, JSONB, BIGSERIAL, pgcrypto UUIDs, indexes); applied to
   PostgreSQL under the `postgres` profile.
 
@@ -100,6 +100,20 @@ preserved across reflags. Read through `IocStore` into the DNS facts
 (`maliciousFlagCount`), so feed flags survive restarts and a shared DB scales
 the store horizontally.
 
+### actg_node + actg_edge (ACTG trust graph)
+Persistent backing for the Security Knowledge Graph (Flyway `V6__actg_graph.sql`):
+
+| Table | Columns | Notes |
+|---|---|---|
+| `actg_node` | `node_key` PK, `entity_type`, `label`, `risk`, `last_seen_at` | one row per graph node |
+| `actg_edge` | `edge_id` identity, `source_key`, `target_key`, `relation`, `weight`, `observed_at` | unique `(source_key, target_key, relation)` |
+
+`JdbcActgStore` writes every association/observation through to the database
+(update-then-insert upsert, `weight` strengthening bounded at 3.0) and calls
+`load()` at startup to restore nodes and edges with their **exact** stored
+weights and high-water risk — a clean domain that once resolved to a
+known-bad IP is still suspicious after a restart.
+
 ## 2. Seed data
 
 Both schemas seed a baseline:
@@ -119,7 +133,7 @@ Both schemas seed a baseline:
 |---|---|---|
 | Driver | H2 (`MODE=PostgreSQL`) | PostgreSQL 14+ |
 | Data | ephemeral in-memory | persistent |
-| Schema load | `spring.sql.init` on startup | Flyway migrations (`V1..V5`) |
+| Schema load | `spring.sql.init` on startup | Flyway migrations (`V1..V6`) |
 | Types | TEXT / BIGINT IDENTITY / UUID | TIMESTAMPTZ / JSONB / BIGSERIAL |
 
 To switch profiles:

@@ -2,7 +2,6 @@ package com.cognesis.framework.config;
 
 import com.cognesis.framework.acde.AcdeEngine;
 import com.cognesis.framework.actg.ActgGraph;
-import com.cognesis.framework.actg.SecurityKnowledgeGraph;
 import com.cognesis.framework.algorithm.SynapseEngine;
 import com.cognesis.framework.algorithm.SynapseWeights;
 import com.cognesis.framework.context.ContextEngine;
@@ -30,6 +29,19 @@ import com.cognesis.framework.dns.analyzer.ThreatMemoryAnalyzer;
 import com.cognesis.framework.dns.analyzer.TyposquattingAnalyzer;
 import com.cognesis.framework.dns.analyzer.UserBehaviourAnalyzer;
 import com.cognesis.framework.dns.analyzer.WhoisAnalyzer;
+import com.cognesis.framework.email.EmailFactsRepository;
+import com.cognesis.framework.email.EmailIntelligenceEngine;
+import com.cognesis.framework.email.EmailIntelligenceEngineImpl;
+import com.cognesis.framework.email.EmailSignalAnalyzer;
+import com.cognesis.framework.email.InMemoryEmailFactsRepository;
+import com.cognesis.framework.email.analyzer.AttachmentAnalyzer;
+import com.cognesis.framework.email.analyzer.EmailAuthAnalyzer;
+import com.cognesis.framework.email.analyzer.EmailPolicyAnalyzer;
+import com.cognesis.framework.email.analyzer.LinkAnalyzer;
+import com.cognesis.framework.email.analyzer.SenderDomainAgeAnalyzer;
+import com.cognesis.framework.email.analyzer.SenderReputationAnalyzer;
+import com.cognesis.framework.email.analyzer.SpoofingAnalyzer;
+import com.cognesis.framework.email.analyzer.ThreatIntelEmailAnalyzer;
 import com.cognesis.framework.feed.ThreatFeedIngestor;
 import com.cognesis.framework.impact.AssetRegistry;
 import com.cognesis.framework.impact.ImpactEngine;
@@ -48,6 +60,7 @@ import com.cognesis.framework.observatory.EvidenceIngestor;
 import com.cognesis.framework.observatory.EvidenceProvider;
 import com.cognesis.framework.persistence.DecisionLogDao;
 import com.cognesis.framework.persistence.IocStore;
+import com.cognesis.framework.persistence.JdbcActgStore;
 import com.cognesis.framework.persistence.JdbcDecisionLogDao;
 import com.cognesis.framework.persistence.JdbcIocStore;
 import com.cognesis.framework.persistence.JdbcMemoryGraphDao;
@@ -142,9 +155,24 @@ public class AppConfig {
         return new PactRecommendationEngine();
     }
 
+    /**
+     * The ACTG graph is JDBC-backed: every observation is written through to
+     * the database, and {@link JdbcActgStore#load()} restores it at startup so
+     * accumulated risk and relationships survive restarts.
+     */
     @Bean
-    public ActgGraph actgGraph() {
-        return new SecurityKnowledgeGraph();
+    public ActgGraph actgGraph(NamedParameterJdbcTemplate jdbcTemplate) {
+        return new JdbcActgStore(jdbcTemplate);
+    }
+
+    /** Hydrate the ACTG graph from the database once at boot. */
+    @Bean
+    public ApplicationRunner actgGraphLoadOnStartup(ActgGraph actgGraph) {
+        return args -> {
+            if (actgGraph instanceof JdbcActgStore store) {
+                store.load();
+            }
+        };
     }
 
     // ------------------------------------------------------------------
@@ -281,6 +309,38 @@ public class AppConfig {
                                                        ActgGraph actgGraph,
                                                        CognesisMetrics metrics) {
         return new DnsIntelligenceEngineImpl(dnsFactsRepository, dnsSignalAnalyzers, acdeEngine,
+                actgGraph, metrics);
+    }
+
+    // ------------------------------------------------------------------
+    // VOID email intelligence engine (second domain engine)
+    // ------------------------------------------------------------------
+
+    @Bean
+    public EmailFactsRepository emailFactsRepository() {
+        return new InMemoryEmailFactsRepository();
+    }
+
+    @Bean
+    public List<EmailSignalAnalyzer> emailSignalAnalyzers(PolicyEvaluator policyEvaluator) {
+        return List.of(
+                new EmailAuthAnalyzer(),
+                new SenderDomainAgeAnalyzer(),
+                new SpoofingAnalyzer(),
+                new LinkAnalyzer(),
+                new AttachmentAnalyzer(),
+                new SenderReputationAnalyzer(),
+                new ThreatIntelEmailAnalyzer(),
+                new EmailPolicyAnalyzer(policyEvaluator));
+    }
+
+    @Bean
+    public EmailIntelligenceEngine emailIntelligenceEngine(EmailFactsRepository emailFactsRepository,
+                                                           List<EmailSignalAnalyzer> emailSignalAnalyzers,
+                                                           AcdeEngine acdeEngine,
+                                                           ActgGraph actgGraph,
+                                                           CognesisMetrics metrics) {
+        return new EmailIntelligenceEngineImpl(emailFactsRepository, emailSignalAnalyzers, acdeEngine,
                 actgGraph, metrics);
     }
 

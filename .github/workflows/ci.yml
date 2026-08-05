@@ -81,7 +81,7 @@ jobs:
 
       - name: Boot app and ingest live feed
         run: |
-          nohup java -jar target/cognesis-framework-1.0.0-SNAPSHOT.jar > app.log 2>&1 &
+          nohup java -jar target/cognesis-framework-1.2.0.jar > app.log 2>&1 &
           for i in $(seq 1 60); do
             if grep -q "Started CognesisApplication" app.log; then break; fi
             sleep 2

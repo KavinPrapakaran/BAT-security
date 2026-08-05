@@ -13,7 +13,7 @@
 
     <groupId>com.cognesis</groupId>
     <artifactId>cognesis-framework</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.2.0</version>
     <name>BAT security v1.2.0</name>
     <description>Engineering-first, evidence-driven. A modular cybersecurity decision framework: ACTG adaptive cognitive trust graph, SYNAPSE decision algorithm, ACDE decision core, DIE DNS intelligence engine, Fides trust engine, Mnemonic memory engine, LORE decision learning, and organization profiles.</description>
 

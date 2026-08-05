@@ -17,5 +17,6 @@ public enum Provenance {
     ANALYST_INPUT,
     TELEMETRY,
     CONFIGURATION,
-    GRAPH
+    GRAPH,
+    EMAIL_GATEWAY
 }

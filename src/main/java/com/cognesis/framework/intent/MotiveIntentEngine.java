@@ -32,6 +32,13 @@ public class MotiveIntentEngine implements IntentEngine {
         evidenceToIntent.put("DNS_SUBDOMAIN_BEHAVIOUR", Map.of("EVASION", 0.60, "MALWARE_COMMS", 0.40));
         evidenceToIntent.put("USER_BEHAVIOUR", Map.of("PHISHING", 0.40, "RECON", 0.60));
         evidenceToIntent.put("NETWORK_BEHAVIOUR", Map.of("RECON", 0.50, "SCANNING", 0.50));
+        // VOID email family
+        evidenceToIntent.put("EMAIL_AUTH", Map.of("PHISHING", 0.60, "SPOOFING", 0.40));
+        evidenceToIntent.put("EMAIL_SENDER_AGE", Map.of("PHISHING", 0.55, "BULK_SCAM", 0.45));
+        evidenceToIntent.put("EMAIL_SPOOF", Map.of("SPOOFING", 0.80, "PHISHING", 0.20));
+        evidenceToIntent.put("EMAIL_LINKS", Map.of("PHISHING", 0.70, "MALWARE_COMMS", 0.30));
+        evidenceToIntent.put("EMAIL_ATTACHMENTS", Map.of("MALWARE_COMMS", 0.75, "RANSOMWARE", 0.25));
+        evidenceToIntent.put("EMAIL_SENDER_REP", Map.of("BULK_SCAM", 0.50, "PHISHING", 0.50));
     }
 
     @Override

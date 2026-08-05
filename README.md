@@ -35,9 +35,13 @@ src/main/java/com/cognesis/framework/
   learning/          LORE: weight & baseline learning
   policy/            hard policy rule evaluation
   acde/              ACDE: the single decision-maker (Adaptive Cognitive Decision Engine)
-  actg/              ACTG: the adaptive cognitive trust graph (Security Knowledge Graph)
+  actg/              ACTG: the adaptive cognitive trust graph (Security Knowledge Graph),
+                     persisted via Flyway V6 (actg_node / actg_edge)
+  dns/               DIE: DNS Intelligence Engine (17 analyzers)
+  email/             VOID: Email Intelligence Engine (8 analyzers)
+  benchmark/         DecisionBenchmark: Brier score + calibration error + separation
   persistence/       JDBC stores (decision log, trust profiles, memory graph,
-                     persistent IOC flag store)
+                     persistent IOC flag store, ACTG graph store)
   metrics/           Micrometer counters and timers
   validation/        input validation annotations & validators
   security/          fail-closed API key filter (constant-time compare) +
@@ -48,8 +52,8 @@ src/main/java/com/cognesis/framework/
   config/            CognesisProperties + Spring wiring
   api/               REST controllers
 src/main/resources/  application.yml, db/schema-h2.sql, db/migration/
-src/test/java/       118 tests (unit + Spring context + H2 + validation + security
-                     + rate limiting + detection + feed + live facts + IOC persistence)
+src/test/java/       144 tests (unit + Spring context + H2 + validation + security
+                     + rate limiting + detection + feed + live facts + IOC/ACTG persistence)
 ```
 
 ## Requirements
@@ -60,7 +64,7 @@ src/test/java/       118 tests (unit + Spring context + H2 + validation + securi
 ## Build & run
 
 ```bash
-mvn verify        # 118 tests + JaCoCo coverage gate (70% line / 55% branch)
+mvn verify        # 144 tests + JaCoCo coverage gate (70% line / 55% branch)
 mvn package       # runnable Spring Boot jar
 mvn spring-boot:run   # dev profile: in-memory H2, port 8080
 docker compose up --build   # containerised, live feed + live DNS on by default
@@ -96,6 +100,19 @@ curl -s http://localhost:8080/api/v1/dns/evaluate \
   -H 'Content-Type: application/json' \
   -d '{"domain":"paypa1.com","clientId":"alice","clientIp":"10.1.1.5"}'
 ```
+
+Evaluate an inbound email through VOID (the Email Intelligence Engine):
+
+```bash
+curl -s http://localhost:8080/api/v1/email/evaluate \
+  -H 'X-API-Key: your-secret-key' \
+  -H 'Content-Type: application/json' \
+  -d '{"messageId":"msg-002","recipient":"billing@acme.com","clientIp":"10.1.1.5",
+       "context":{"senderIp":"45.155.205.233"}}'
+```
+
+The engine pulls the message's SPF/DKIM/DMARC, sender age, link, attachment
+and reputation signals from its facts repository by `messageId`.
 
 Evaluate any entity through the ACDE (the single decision-maker):
 
@@ -139,6 +156,7 @@ enabled but never refreshed or stale).
 | **ACDE** | Adaptive Cognitive Decision Engine — the single decision-maker | `docs/01-architecture.md` |
 | **SYNAPSE** | Fuses evidence slices into a calibrated risk + decision band | `docs/02-decision-algorithm.md` |
 | **DIE** | DNS Intelligence Engine — 17 analyzers, feeds the ACDE | `docs/03-dns-engine.md` |
+| **VOID** | Email Intelligence Engine — 8 analyzers, feeds the ACDE | `docs/03-dns-engine.md` |
 | **MNEMONIC** | Episodic memory graph, spreading activation, baselines | `docs/04-memory-engine.md` |
 | **FIDES** | Asymmetric, decaying, explainable dynamic trust | `docs/05-trust-engine.md` |
 | Observatory / Context / Seer / Motive / Resolve / Pact / Lore / Profiles | supporting evidence & decision engines | `docs/01-architecture.md` |

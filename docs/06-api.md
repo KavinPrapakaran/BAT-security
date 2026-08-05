@@ -47,7 +47,52 @@ Response (`DnsDecision`):
 Top-level convenience fields on `DnsDecision`: `riskScore()`, `trustScore()`,
 `confidenceScore()`, `businessImpactScore()`, `decisionId()`.
 
-## 2. `POST /api/v1/decisions/evaluate`
+## 2. `POST /api/v1/email/evaluate`
+
+Evaluate an inbound email through VOID. The engine resolves the message by
+`messageId` from its facts repository and runs the 8 email analyzers (SPF/
+DKIM/DMARC auth, sender-domain age, spoofing, links, attachments, sender
+reputation, threat intel, policy), then delegates to the ACDE with activity
+`email`.
+
+```json
+{
+  "messageId": "msg-002",
+  "recipient": "billing@acme.com",
+  "clientIp": "10.1.1.5",
+  "context": { "senderIp": "45.155.205.233" }
+}
+```
+
+Response (`EmailDecision`, reusing the `DecisionResult` shape):
+
+```json
+{
+  "decision": "BLOCK",
+  "outcome": {
+    "decisionId": "9a2e...",
+    "entityId": "msg-002",
+    "entityType": "EMAIL",
+    "decision": "BLOCK",
+    "recommendedAction": "QUARANTINE_EMAIL",
+    "riskScore": 0.83,
+    "trustScore": 0.35,
+    "confidenceScore": 0.87,
+    "businessImpactScore": 0.74,
+    "rationale": "evidence: email-auth fail ...",
+    "reasoningChain": [
+      { "engine": "VOID:EMAIL_AUTH", "claim": "...", "score": 0.9, "confidence": 0.9 }
+    ],
+    "decidedAt": "2026-08-01T..."
+  },
+  "verdictExplanation": "BLOCK: msg-002 scored 0.83 ..."
+}
+```
+
+Same convenience projection as `DnsDecision`: `decisionId()`, `riskScore()`,
+`trustScore()`, `confidenceScore()`, `businessImpactScore()`, `decidedAt()`.
+
+## 3. `POST /api/v1/decisions/evaluate`
 
 General-purpose decision for any entity type.
 
@@ -67,7 +112,7 @@ chain of ≥ 10 steps: OBSERVATORY, ACTG (graph), FIDES, MNEMONIC (salience),
 MNEMONIC (deviation), CONTEXT, MOTIVE, SEER, RESOLVE, PROFILES (org risk
 tolerance, when `context.organizationId` is present), SYNAPSE, PACT.
 
-## 3. Trust management
+## 4. Trust management
 
 ```
 GET  /api/v1/trust/{entityType}/{entityId}
@@ -80,7 +125,7 @@ POST /api/v1/trust/events
      → TrustAssessment (post-update)
 ```
 
-## 4. Memory
+## 5. Memory
 
 ```
 GET  /api/v1/memory/recall?entityId=evil.example&entityType=DOMAIN
@@ -96,7 +141,7 @@ POST /api/v1/memory/incidents
      → 202 Accepted
 ```
 
-## 5. Evidence aggregation
+## 6. Evidence aggregation
 
 ```
 POST /api/v1/evidence/aggregate
@@ -111,7 +156,7 @@ POST /api/v1/evidence/aggregate
 Applies the weighted-mean + dominant-signal aggregation described in
 `docs/01-architecture.md` §3.1.
 
-## 6. `POST /api/v1/detections/dns`
+## 7. `POST /api/v1/detections/dns`
 
 Evaluates a DNS request and exports the verdict as SIEM-ready detection
 artifacts (Sigma YAML + YARA). Body is the same `DnsResolutionRequest` as
@@ -133,7 +178,7 @@ artifacts (Sigma YAML + YARA). Body is the same `DnsResolutionRequest` as
 - YARA: `$a` matches the domain (`ascii wide nocase`), up to 8 reasoning-chain
   claims as secondary strings, with `risk_score` and `decisionId` in meta.
 
-## 7. `POST /api/v1/feeds/refresh`
+## 8. `POST /api/v1/feeds/refresh`
 
 Triggers a threat-intel feed refresh (abuse.ch ThreatFox/URLhaus host-file
 format). No body. Requires a configured feed (see config below); the ingestor
@@ -146,7 +191,7 @@ is a no-op and returns `iocsIngested: 0` when disabled or unreachable.
 Flagged domains (`maliciousFlagCount`) flow into ACDE verdicts via
 `DnsEvidenceProvider`.
 
-## 8. Enumerations (values used in the scaffold)
+## 9. Enumerations (values used in the scaffold)
 
 | Concept | Values |
 |---|---|
@@ -155,7 +200,7 @@ Flagged domains (`maliciousFlagCount`) flow into ACDE verdicts via
 | `EvidenceType` | `DNS_AGE`, `DNS_REGISTRAR`, `DNS_DNSSEC`, `DNS_FAST_FLUX`, `DNS_DGA`, `DNS_HOMOGRAPH`, `DNS_TYPOSQUAT`, `DNS_SUBDOMAIN`, `DNS_CT`, `DNS_WHOIS`, `DNS_HIST_TRUST`, `DNS_THREAT_MEM`, `DNS_POLICY`, `DNS_USER_BEHAV`, `DNS_NET_BEHAV`, `NETWORK_REPUTATION`, `FILE_REPUTATION`, `AUTH_ANOMALY`, `EMAIL_REPUTATION`, `API_ABUSE`, ... |
 | `Provenance` | `DNS_RESPONSE`, `NETWORK_FLOW`, `ENDPOINT_TELEMETRY`, `AUTH_LOG`, `EMAIL_GATEWAY`, `THREAT_INTEL`, `API_GATEWAY`, ... |
 
-## 9. Config reference (`application.yml`, `cognesis.*`)
+## 10. Config reference (`application.yml`, `cognesis.*`)
 
 ```yaml
 cognesis:
@@ -205,7 +250,7 @@ live source is silent does the engine fall back to the seed facts (with an
 explicit `WARN` log and a `cognesis.dns.live.fallback` counter). Domains are
 validated and URL-encoded before any outbound call.
 
-## 10. Security
+## 11. Security
 
 `/api/v1/**` and `/actuator/**` (except `/actuator/health` and
 `/actuator/info`) require an API key: `Authorization: Bearer <key>` or

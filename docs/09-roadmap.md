@@ -165,8 +165,27 @@ expansion) ✅**.
   ACDE applies org-scoped hard rules and scales decision bands by the org's risk
   tolerance using `DnsResolutionRequest.context.organizationId`. Schema:
   `organization_profile` table (Flyway `V5`).
-- **118 tests green**, incl. 22 new (ACTG graph + engine slice, LORE learning,
-  profile evaluation, org policy through the ACDE, DIE end-to-end).
+- **Mid-point check: 118 tests green** (ACTG engine slice, LORE learning,
+  profile evaluation, org policy through the ACDE, DIE end-to-end); **144 tests
+  green** with the additions below.
+- **VOID — Email engine** (second domain engine, proving drop-in ACDE reuse):
+  `email/` ships `EmailFacts` + `EmailSignal` + 8 analyzers (`EmailAuthAnalyzer`
+  SPF/DKIM/DMARC, `SenderDomainAgeAnalyzer`, `SpoofingAnalyzer`, `LinkAnalyzer`,
+  `AttachmentAnalyzer`, `SenderReputationAnalyzer`, `ThreatIntelEmailAnalyzer`,
+  `EmailPolicyAnalyzer` hard-block). `EmailIntelligenceEngine` records ACTG
+  associations before sensing, converts signals to `EvidenceFragment`, and
+  delegates to the ACDE with activity `email` (new evidence types
+  `EMAIL_AUTH`/`EMAIL_SENDER_AGE`/`EMAIL_SPOOF`/`EMAIL_LINKS`/
+  `EMAIL_ATTACHMENTS`/`EMAIL_SENDER_REP`, provenance `EMAIL_GATEWAY`, email
+  intents in `MotiveIntentEngine`). `POST /api/v1/email/evaluate`. 19 new tests.
+- **Calibration benchmark**: `benchmark/DecisionBenchmark` is domain-agnostic —
+  Brier score, base-rate baseline Brier, 5-bin calibration error and
+  separation; verified calibrated + separated on both DNS and email catalogs
+  (both Brier < 0.20). 3 new tests.
+- **ACTG graph persistence**: Flyway `V6` adds `actg_node` / `actg_edge`;
+  `JdbcActgStore` mirrors the `JdbcIocStore` portable upsert pattern, restores
+  exact edge weights and node high-water risk via the reload path on startup,
+  and clears both stores. 4 new tests.
 
 ## 7. Later (framework growth)
 
@@ -179,7 +198,6 @@ expansion) ✅**.
 - **CORTEX — Identity engine**: evaluates accounts/IPs/sessions; consumes
   AUTH_ANOMALY, GEO, device signals; adds an auth slice to SYNAPSE.
 - **ELEVATE — Cloud engine**: evaluates cloud resources/policies.
-- **VOID — Email engine**: evaluates inbound message risk before delivery.
 - **SENTRY — Endpoint engine**: evaluates process/host risk.
 
 Each is a new `*Engine` + providers + analyzers feeding the ACDE;

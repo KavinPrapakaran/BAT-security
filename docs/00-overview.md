@@ -105,7 +105,7 @@ A working scaffold exists in this repository:
 - Storage: **H2 (in-memory, PostgreSQL mode)** for dev/test; **PostgreSQL**
   schema shipped for production.
 - API: REST at `/api/v1/**` (see `docs/06-api.md`).
-- Tests: 118 tests, all green (see `docs/08-testing.md`), including a full
+- Tests: 144 tests, all green (see `docs/08-testing.md`), including a full
   Spring context smoke test against H2.
 
 Engine | Code | Tests
@@ -115,11 +115,14 @@ ACDE (single decision-maker) | `acde/AcdeEngine` | +4 (org profiles)
 SYNAPSE decision | `algorithm/SynapseEngine` | 6
 Observatory | `observatory/*` | (via DIE)
 DIE (DNS Intelligence Engine) | `dns/*` + 17 analyzers | 9
+VOID (Email Intelligence Engine) | `email/*` + 8 analyzers | 19
+Benchmark (calibration) | `benchmark/DecisionBenchmark` | 3
 LORE (decision learning) | `learning/LoreLearningEngine` | 9
 Profiles (organization) | `profile/ProfileEvaluationEngine` | 5
 Mnemonic memory | `memory/MnemonicMemoryEngine` | 8
 Fides trust | `trust/FidesTrustEngine` | 6
 Context | `context/SituationalContextEngine` | 4
+Persistence | `persistence/*` (IOC + ACTG + decision log) | 7
 Spring boot wiring + H2 | `CognesisApplication` + config | 3
 
 ## 6. Terminology glossary

@@ -36,12 +36,17 @@
 | `LiveDnsFactsRepositoryTest` | live DNS/RDAP/CT facts via mock HTTP | 7 tests: assembles facts from all three sources; wholesale fallback when every source is offline; partial failure still uses responding sources; feed flags survive the live merge; results cached (no second network round-trip); **secondary DoH resolver failover (Google-format response)**; **unsafe domain input rejected with no outbound call** |
 | `IocEscalationTest` | feed IOC → ACDE verdict | 2 tests: flagged domain strictly riskier + non-ALLOW; reasoning chain contains the `DIE:THREAT_INTEL` step |
 | `JdbcIocStoreTest` | persistent IOC store (H2) | 3 tests: flag counts survive a new store instance; unknown domain → zero flags; `first_seen` stable across reflags |
+| `JdbcActgStoreTest` | persistent ACTG graph (H2) | 4 tests: nodes/edges survive a new store instance; high-water risk and neighborhood risk survive reload; repeated associations stay one strengthening edge; `clear` wipes the database too |
 | `IocPersistenceTest` | feed flags across repository instances | 2 tests: a feed-flagged IOC surfaces through a fresh repository sharing the store; unknown domain stays clean |
+| `EmailAnalyzersTest` | 8 email analyzers | 12 tests: auth verdicts (pass/none/fail); sender-age (brand-new vs aged); spoofing; suspicious links; malicious attachments; negative sender reputation; threat-intel flag; policy hard-block; clean message floor; per-analyzer evidence types |
+| `EmailIntelligenceEngineTest` | VOID end-to-end via ACDE | 5 tests: phishing msg-002 → BLOCK with intent; clean msg-001 → ALLOW; internal msg-003 → ALLOW; ambiguous msg-004 → non-ALLOW; reasoning chain + ACTG association recorded |
+| `DecisionBenchmarkTest` | calibration benchmark | 3 tests: DNS catalog beats base-rate baseline (Brier < 0.20); email catalog beats baseline; both engines separate positives from negatives |
+| `EmailControllerTest` | VOID REST endpoint | 2 tests: unknown message handled; known message produces a decision |
 | `RateLimitFilterTest` | sliding-window rate limiter | 5 tests: requests within window pass; over-window → 429 + `Retry-After: 60`; clients limited independently; disabled filter never limits; `/actuator/health` exempt |
 | `FailClosedTest` | security fail-closed posture | 3 tests: protected endpoints 403 with no configured keys; presented key still 403; `/actuator/metrics` locked too |
 | `FeedHealthIndicatorTest` | feed health | 3 tests: disabled feed UP; enabled-but-never-refreshed DOWN; fresh refresh UP with IOC count |
 
-**Total: 118 tests, 0 failures.** Line coverage and branch coverage both clear
+**Total: 144 tests, 0 failures.** Line coverage and branch coverage both clear
 the JaCoCo gate (line ≥ 70%, branch ≥ 55%).
 
 ## 3. Running
@@ -84,6 +89,13 @@ These encode the framework's key design decisions as regression guards:
    (locks the Fides asymmetry + the semantic event vocabulary).
 8. **`recordDecisionStoresDecisionNodeLinkedToEntity`** — every decision keeps
    its reasoning path in memory, so "why did we do X" is always answerable.
+9. **`dnsCatalogBeatsBaseRateBaseline` / `emailCatalogBeatsBaseline`** — the
+   `DecisionBenchmark` harness asserts Brier score and 5-bin calibration error
+   are strictly better than a base-rate guesser on both the DNS and email
+   catalogs (both Brier < 0.20), locking calibration as a regression guard.
+10. **`graphPersistsAcrossStoreInstances`** — nodes, exact edge weights and
+    high-water risk survive a fresh store on the same database (locks the ACTG
+    restart invariant).
 
 ## 5. CI
 

@@ -26,6 +26,13 @@ public enum EvidenceType {
     NETWORK_BEHAVIOUR,
     IDENTITY,
     EMAIL,
+    // Email family (VOID)
+    EMAIL_AUTH,
+    EMAIL_SENDER_AGE,
+    EMAIL_SPOOF,
+    EMAIL_LINKS,
+    EMAIL_ATTACHMENTS,
+    EMAIL_SENDER_REP,
     CLOUD,
     API,
     IOT,
