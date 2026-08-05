@@ -32,7 +32,7 @@ public class DashboardController {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("timestamp", Instant.now().toString());
-        result.put("version", "1.0.0");
+        result.put("version", "1.2.0");
         result.put("status", "RUNNING");
 
         Map<String, Object> weights = new LinkedHashMap<>();
