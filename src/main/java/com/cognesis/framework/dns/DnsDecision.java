@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * The verdict of the Cognitive DNS Engine for one resolution request.
+ * The verdict of the DNS Intelligence Engine for one resolution request.
  * It reuses the framework DecisionResult shape so any consumer (proxy, resolver
  * policy engine, SIEM) can act on it uniformly.
  */

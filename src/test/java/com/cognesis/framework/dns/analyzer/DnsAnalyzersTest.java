@@ -83,12 +83,12 @@ class DnsAnalyzersTest {
     private DnsFacts facts(String domain) {
         return new DnsFacts(domain, 300, true, 1, 0, 0.02,
                 List.of("www"), "disabled", Instant.now().minusSeconds(86400 * 30),
-                3, true, 0);
+                3, true, 0, List.of("93.184.216.34"));
     }
 
     private DnsFacts factsWithAge(String domain, long ageDays) {
         return new DnsFacts(domain, ageDays, false, 1, 1, 0.3,
                 List.of(), "enabled", Instant.now().minusSeconds(86400),
-                1, false, 0);
+                1, false, 0, List.of());
     }
 }

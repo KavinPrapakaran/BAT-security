@@ -5,9 +5,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
- * COGNESIS - Cognitive Security Decision Framework.
- * Bootstraps the Spring context that wires the SYNAPSE decision algorithm,
- * Fides trust engine, Mnemonic memory engine and the Cognitive DNS Engine.
+ * BAT security - engineering-first, evidence-driven.
+ * Bootstraps the Spring context that wires the ACTG trust graph, SYNAPSE
+ * decision algorithm, Fides trust engine, Mnemonic memory engine, LORE
+ * decision learning and the DNS Intelligence Engine.
  */
 @SpringBootApplication
 @EnableScheduling

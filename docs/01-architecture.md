@@ -1,4 +1,4 @@
-# COGNESIS — Architecture
+# BAT security — Architecture
 
 ## 1. Design goals
 
@@ -38,31 +38,39 @@
    │       RESOLVE            │  │      POLICY EVALUATOR │
    │   impact engine          │  │   (hard rules)        │
    └────────────┬─────────────┘  └──────────┬───────────┘
-                │                           │
-                └──────────┬────────────────┘
+                │   ACTG graph slice        │  PROFILES slice
+                │   (relationship risk)     │  (org risk tolerance)
+                ▼                           ▼
+                 └──────────┬────────────────┘
+                            ▼
+                  ┌──────────────────┐
+                  │     SYNAPSE      │  decision band + risk score
+                  │  decision engine │  (fuses all slices)
+                  └────────┬─────────┘
+                           │
                            ▼
-                 ┌──────────────────┐
-                 │     SYNAPSE      │  decision band + risk score
-                 │  decision engine │  (fuses all slices)
-                 └────────┬─────────┘
-                          │
-                          ▼
-                 ┌──────────────────┐
-                 │       PACT       │  recommended actions
-                 │  recommendation  │
-                 └────────┬─────────┘
-                          │
-                          ▼
-              ┌───────────────────────┐
-              │   Decision + chain    │  ──► API, policy proxy, log
-              └───────────────────────┘
-                          │ outcomes
-                          ▼
-                 ┌──────────────────┐
-                 │      LORE        │  weight/baseline learning
-                 │  learning engine │  (offline / batched)
-                 └──────────────────┘
+                  ┌──────────────────┐
+                  │       PACT       │  recommended actions
+                  │  recommendation  │
+                  └────────┬─────────┘
+                           │
+                           ▼
+               ┌───────────────────────┐
+               │   Decision + chain    │  ──► API, policy proxy, log
+               └───────────────────────┘
+                           │ outcomes
+                           ▼
+                  ┌──────────────────┐
+                  │      LORE        │  weight/baseline learning
+                  │  learning engine │  (offline / batched)
+                  └──────────────────┘
 ```
+
+The **ACTG** (Adaptive Cognitive Trust Graph) layer sits underneath the whole
+pipeline: every time an entity is observed, its *relationships* (domain resolves
+to IP, request made by user/device, certificate issued for domain, incident
+associated with entity) are recorded as graph edges, so first-touch entities
+inherit the risk of everything they touch.
 
 ## 3. Logical layers
 
@@ -84,7 +92,9 @@ Each engine reads the same aggregated evidence and produces one **slice**:
 | Seer | `S_prediction` | Predicted future risk |
 | Motive | `S_intent` | Most likely adversarial intent + weight |
 | Resolve | `S_impact` | Business impact of the entity's assets |
-| CODE | `S_dns` (DNS domain) | Module-specific evidence (15 analyzers) |
+| ACTG | `S_graph` | Relationship risk: what the entity's neighbours are, and how they behave |
+| Profiles | `S_profile` | Org risk tolerance band scaling + org-scoped hard rules |
+| DIE | `S_dns` (DNS domain) | Module-specific evidence (17 analyzers) |
 
 ### 3.3 Decision layer (Synapse + Pact)
 - `SynapseEngine` fuses slices with learned weights → risk + band.
@@ -106,11 +116,13 @@ normalises each contribution, and runs one canonical reasoning chain:
 
 ```
 Evidence  → OBSERVATORY   aggregated strength + confidence of the evidence pool
+Relations → ACTG          graph risk: neighbours, edge strengths, associations
 Trust     → FIDES         dynamic entity trust over observation history
 Context   → CONTEXT       situational environment risk + weight
 Intent    → MOTIVE        fused adversarial intent from the evidence families
 Prediction→ SEER          near-future risk from the entity's risk trend
 Impact    → RESOLVE       business value at risk
+Profile   → PROFILES      org risk tolerance scaling + org-scoped policy rules
 Confidence→ SYNAPSE       fused risk + confidence (bands: Allow..Block)
 Action    → PACT          concrete recommended action
 ```
@@ -126,13 +138,14 @@ Action    → PACT          concrete recommended action
   recalls can answer "we decided X about this entity, and here is why"),
 - records the risk in SEER for trend learning.
 
-The DNS engine (CODE) is one consumer: it runs its senses and hands the
-resulting evidence fragments to the ACDE, which yields a total chain of
-≥ 10 steps when evaluating domains.
+The DNS engine (DIE) is one consumer: it runs its senses, records the domain→IP
+resolutions into the ACTG graph *before* analysing (so first-touch inheritance
+works), and hands the resulting evidence fragments to the ACDE, which yields a
+total chain of ≥ 10 steps when evaluating domains.
 
 ## 5. Integration points
 
-COGNESIS exposes **three** consumption modes:
+BAT security exposes **three** consumption modes:
 
 1. **REST API** (`/api/v1/**`) — for UI, SOAR, and ad-hoc queries.
 2. **Decision log** (`decision_log` table) — for audit and downstream analytics.

@@ -1,16 +1,19 @@
 package com.cognesis.framework.config;
 
 import com.cognesis.framework.acde.AcdeEngine;
+import com.cognesis.framework.actg.ActgGraph;
+import com.cognesis.framework.actg.SecurityKnowledgeGraph;
 import com.cognesis.framework.algorithm.SynapseEngine;
 import com.cognesis.framework.algorithm.SynapseWeights;
 import com.cognesis.framework.context.ContextEngine;
 import com.cognesis.framework.context.SituationalContextEngine;
-import com.cognesis.framework.dns.CognitiveDnsEngine;
-import com.cognesis.framework.dns.CognitiveDnsEngineImpl;
 import com.cognesis.framework.dns.DnsFactsRepository;
+import com.cognesis.framework.dns.DnsIntelligenceEngine;
+import com.cognesis.framework.dns.DnsIntelligenceEngineImpl;
 import com.cognesis.framework.dns.DnsSignalAnalyzer;
 import com.cognesis.framework.dns.InMemoryDnsFactsRepository;
 import com.cognesis.framework.dns.LiveDnsFactsRepository;
+import com.cognesis.framework.dns.analyzer.ActgAnalyzer;
 import com.cognesis.framework.dns.analyzer.CertificateTransparencyAnalyzer;
 import com.cognesis.framework.dns.analyzer.DgaAnalyzer;
 import com.cognesis.framework.dns.analyzer.DnssecAnalyzer;
@@ -56,6 +59,7 @@ import com.cognesis.framework.policy.PolicyEvaluator;
 import com.cognesis.framework.policy.PolicyRule;
 import com.cognesis.framework.prediction.PredictionEngine;
 import com.cognesis.framework.prediction.SeerPredictionEngine;
+import com.cognesis.framework.profile.ProfileEvaluationEngine;
 import com.cognesis.framework.recommend.PactRecommendationEngine;
 import com.cognesis.framework.recommend.RecommendationEngine;
 import com.cognesis.framework.trust.FidesTrustEngine;
@@ -77,7 +81,7 @@ import javax.sql.DataSource;
 import java.util.List;
 
 /**
- * Spring wiring for the COGNESIS scaffold. Every engine is declared here as a
+ * Spring wiring for the BAT security scaffold. Every engine is declared here as a
  * bean; production deployments can override individual beans without touching
  * the engine implementations (dependency inversion in action).
  */
@@ -138,6 +142,11 @@ public class AppConfig {
         return new PactRecommendationEngine();
     }
 
+    @Bean
+    public ActgGraph actgGraph() {
+        return new SecurityKnowledgeGraph();
+    }
+
     // ------------------------------------------------------------------
     // Policy & assets
     // ------------------------------------------------------------------
@@ -153,6 +162,11 @@ public class AppConfig {
     @Bean
     public AssetRegistry assetRegistry() {
         return new InMemoryAssetRegistry();
+    }
+
+    @Bean
+    public ProfileEvaluationEngine profileEvaluationEngine() {
+        return ProfileEvaluationEngine.withDefaults();
     }
 
     // ------------------------------------------------------------------
@@ -232,13 +246,14 @@ public class AppConfig {
     }
 
     // ------------------------------------------------------------------
-    // Cognitive DNS Engine
+    // DNS Intelligence Engine
     // ------------------------------------------------------------------
 
     @Bean
     public List<DnsSignalAnalyzer> dnsSignalAnalyzers(TrustEngine trustEngine,
                                                       MemoryEngine memoryEngine,
-                                                      PolicyEvaluator policyEvaluator) {
+                                                      PolicyEvaluator policyEvaluator,
+                                                      ActgGraph actgGraph) {
         return List.of(
                 new DomainAgeAnalyzer(),
                 new DgaAnalyzer(),
@@ -255,14 +270,18 @@ public class AppConfig {
                 new ThreatMemoryAnalyzer(memoryEngine),
                 new ThreatIntelAnalyzer(),
                 new UserBehaviourAnalyzer(trustEngine),
-                new NetworkBehaviourAnalyzer(trustEngine));
+                new NetworkBehaviourAnalyzer(trustEngine),
+                new ActgAnalyzer(actgGraph));
     }
 
     @Bean
-    public CognitiveDnsEngine cognitiveDnsEngine(DnsFactsRepository dnsFactsRepository,
-                                                 List<DnsSignalAnalyzer> dnsSignalAnalyzers,
-                                                 AcdeEngine acdeEngine) {
-        return new CognitiveDnsEngineImpl(dnsFactsRepository, dnsSignalAnalyzers, acdeEngine);
+    public DnsIntelligenceEngine dnsIntelligenceEngine(DnsFactsRepository dnsFactsRepository,
+                                                       List<DnsSignalAnalyzer> dnsSignalAnalyzers,
+                                                       AcdeEngine acdeEngine,
+                                                       ActgGraph actgGraph,
+                                                       CognesisMetrics metrics) {
+        return new DnsIntelligenceEngineImpl(dnsFactsRepository, dnsSignalAnalyzers, acdeEngine,
+                actgGraph, metrics);
     }
 
     // ------------------------------------------------------------------
@@ -282,10 +301,11 @@ public class AppConfig {
                                  SynapseEngine synapseEngine,
                                  WeightStore weightStore,
                                  DecisionLogDao decisionLogDao,
-                                 PolicyEvaluator policyEvaluator) {
+                                 PolicyEvaluator policyEvaluator,
+                                 ProfileEvaluationEngine profileEvaluationEngine) {
         return new AcdeEngine(evidenceProviders, evidenceIngestor, trustEngine, memoryEngine,
                 contextEngine, predictionEngine, intentEngine, impactEngine, recommendationEngine,
-                synapseEngine, weightStore, decisionLogDao, policyEvaluator);
+                synapseEngine, weightStore, decisionLogDao, policyEvaluator, profileEvaluationEngine);
     }
 
     @Bean

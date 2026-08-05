@@ -11,8 +11,8 @@ import java.util.Locale;
 import java.util.UUID;
 
 /**
- * Converts a COGNESIS verdict into industry-standard detection content so the
- * decision can be consumed by any SIEM (Sigma) or endpoint scanner (YARA).
+ * Converts a BAT security verdict into industry-standard detection content so
+ * the decision can be consumed by any SIEM (Sigma) or endpoint scanner (YARA).
  * This bridges the framework to real security tooling.
  */
 public final class DetectionRuleGenerator {
@@ -27,11 +27,11 @@ public final class DetectionRuleGenerator {
         Decision d = result.decision();
         String level = sigmaLevel(d);
         StringBuilder sb = new StringBuilder();
-        sb.append("title: COGNESIS - ").append(d).append(" on ").append(sanitizeYaml(result.entityId())).append('\n');
+        sb.append("title: BAT security - ").append(d).append(" on ").append(sanitizeYaml(result.entityId())).append('\n');
         sb.append("id: ").append(result.decisionId()).append('\n');
         sb.append("status: experimental\n");
         sb.append("description: \"").append(escapeYaml(result.rationale())).append("\"\n");
-        sb.append("author: COGNESIS\n");
+        sb.append("author: BAT security\n");
         sb.append("date: ").append(Instant.now().atZone(ZoneOffset.UTC).toLocalDate()).append('\n');
         sb.append("tags:\n  - attack.discovery\n");
         sb.append("logsource:\n  category: dns_query\n");
@@ -56,10 +56,10 @@ public final class DetectionRuleGenerator {
         Decision d = result.decision();
         String domain = result.entityId();
         StringBuilder sb = new StringBuilder();
-        sb.append("rule cogensis_high_risk_").append(d.name().toLowerCase(Locale.ROOT)).append(" {\n");
+        sb.append("rule batsec_high_risk_").append(d.name().toLowerCase(Locale.ROOT)).append(" {\n");
         sb.append("    meta:\n");
         sb.append("        description = \"").append(escapeYara(result.rationale())).append("\"\n");
-        sb.append("        author = \"COGNESIS\"\n");
+        sb.append("        author = \"BAT security\"\n");
         sb.append("        reference = \"decision ").append(result.decisionId()).append("\"\n");
         sb.append("        risk_score = \"").append(String.format(Locale.ROOT, "%.2f", result.riskScore())).append("\"\n");
         sb.append("        date = \"").append(ISO.format(result.decidedAt())).append("\"\n");

@@ -26,7 +26,7 @@ class DetectionRuleGeneratorTest {
             0.8,
             "Domain matched a known malware distribution pattern",
             List.of(
-                    new ReasoningStep("CODE", "malware distribution", 0.9, 0.85, "feed flag", Instant.now()),
+                    new ReasoningStep("DIE", "malware distribution", 0.9, 0.85, "feed flag", Instant.now()),
                     new ReasoningStep("FIDES", "low trust", 0.8, 0.7, "no history", Instant.now())),
             Instant.now());
 
@@ -34,7 +34,7 @@ class DetectionRuleGeneratorTest {
     void sigmaRuleIsWellFormedYaml() {
         String sigma = DetectionRuleGenerator.sigmaRule(result);
         assertNotNull(sigma);
-        assertTrue(sigma.contains("title: COGNESIS - BLOCK"));
+        assertTrue(sigma.contains("title: BAT security - BLOCK"));
         assertTrue(sigma.contains("level: critical"), "BLOCK must map to critical");
         assertTrue(sigma.contains("category: dns_query"));
         assertTrue(sigma.contains("query|cstartswith: evil-payload.example"));
@@ -55,7 +55,7 @@ class DetectionRuleGeneratorTest {
     void yaraRuleIsWellFormed() {
         String yara = DetectionRuleGenerator.yaraRule(result);
         assertNotNull(yara);
-        assertTrue(yara.startsWith("rule cogensis_high_risk_block {"));
+        assertTrue(yara.startsWith("rule batsec_high_risk_block {"));
         assertTrue(yara.contains("$a = \"evil-payload.example\" ascii wide nocase"));
         assertTrue(yara.contains("risk_score = \"0.95\""));
         assertTrue(yara.contains("condition:"));

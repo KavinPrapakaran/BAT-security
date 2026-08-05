@@ -26,6 +26,10 @@ public class InMemoryPolicyEvaluator implements PolicyEvaluator {
         String target = entityId == null ? "" : entityId.toLowerCase(Locale.ROOT);
         List<String> matched = new ArrayList<>();
         for (PolicyRule rule : rules) {
+            // org-scoped rules are handled by the ProfileEvaluationEngine
+            if (rule.organizationId() != null) {
+                continue;
+            }
             String matchTarget = rule.matchTarget() == null ? "" : rule.matchTarget().toLowerCase(Locale.ROOT);
             boolean hit = switch (rule.ruleType()) {
                 case "BLOCK_LIST", "ALLOW_LIST" -> target.equals(matchTarget) || target.endsWith("." + matchTarget);

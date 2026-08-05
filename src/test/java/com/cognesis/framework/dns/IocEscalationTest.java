@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class IocEscalationTest {
 
-    private CognitiveDnsEngine engine;
+    private DnsIntelligenceEngine engine;
     private InMemoryDnsFactsRepository repo;
 
     @BeforeEach
@@ -57,7 +57,7 @@ class IocEscalationTest {
                 new DecisionLogDao() {
                 }, policy);
 
-        engine = new CognitiveDnsEngineImpl(repo,
+        engine = new DnsIntelligenceEngineImpl(repo,
                 List.of(new DomainAgeAnalyzer(), new ThreatIntelAnalyzer()),
                 acde);
     }
@@ -87,7 +87,7 @@ class IocEscalationTest {
         DnsDecision decision = engine.evaluate(DnsResolutionRequest.of(domain, "alice", "10.1.1.5"));
 
         boolean hasThreatIntelStep = decision.outcome().reasoningChain().stream()
-                .filter(s -> s.engine().startsWith("CODE:THREAT_INTEL"))
+                .filter(s -> s.engine().startsWith("DIE:THREAT_INTEL"))
                 .anyMatch(s -> s.claim().toLowerCase().contains("flag"));
         assertTrue(hasThreatIntelStep, "reasoning chain must surface the feed flag");
         assertTrue(decision.decision() != Decision.ALLOW, "twice-flagged domain must not be allowed outright");

@@ -19,6 +19,8 @@ public class CognesisMetrics {
     private final Counter liveFactsHits;
     private final Counter liveFactsMisses;
     private final Counter liveFactsFailures;
+    private final Counter graphAssociations;
+    private final Counter feedbackEvents;
 
     public CognesisMetrics(MeterRegistry registry) {
         this.registry = registry;
@@ -46,6 +48,12 @@ public class CognesisMetrics {
                 .register(registry);
         this.liveFactsFailures = Counter.builder("cognesis.live.facts.failures")
                 .description("Live DNS facts lookups that failed all sources")
+                .register(registry);
+        this.graphAssociations = Counter.builder("cognesis.actg.associations.total")
+                .description("ACTG graph relationships recorded")
+                .register(registry);
+        this.feedbackEvents = Counter.builder("cognesis.learning.feedback.total")
+                .description("Decision feedback events received")
                 .register(registry);
     }
 
@@ -81,5 +89,13 @@ public class CognesisMetrics {
 
     public void recordLiveFactsFallback() {
         liveFactsFailures.increment();
+    }
+
+    public void recordActgAssociations(int count) {
+        graphAssociations.increment(count);
+    }
+
+    public void recordFeedback(int count) {
+        feedbackEvents.increment(count);
     }
 }

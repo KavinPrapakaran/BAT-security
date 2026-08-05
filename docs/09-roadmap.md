@@ -1,8 +1,9 @@
-# COGNESIS — Roadmap
+# BAT security — Roadmap
 
 **Version plan:** v0.1.0 scaffold ✅ · v0.2.0 Cognitive Core ✅ · v0.3.0
 Persistence & Observability ✅ · v1.0.0 Stable ✅ · v1.1.0 Detection & live
-intel ✅ · v1.1.1 Hardening ✅.
+intel ✅ · v1.1.1 Hardening ✅ · **v1.2.0 BAT security (branding + intelligence
+expansion) ✅**.
 
 ## 1. Done
 
@@ -11,7 +12,7 @@ intel ✅ · v1.1.1 Hardening ✅.
   facets, decision bands, tolerance + low-confidence escalation.
 - **Observatory**: evidence model, aggregation with dominant-signal rule,
   `DnsEvidenceProvider`.
-- **CODE**: Cognitive DNS Engine with 15 analyzers, hard policy override,
+- **DIE**: DNS Intelligence Engine with 17 analyzers, hard policy override,
   intent enrichment, ≥10-step reasoning chain.
 - **Fides**: asymmetric, decaying, mean-reverting trust with confidence.
 - **Mnemonic**: knowledge-graph episodic memory, 2-hop spreading activation,
@@ -39,7 +40,8 @@ intel ✅ · v1.1.1 Hardening ✅.
 - **Trust evolution**: semantic events (`TrustEvent.Events`) — certificate
   change, DNS change, suspicious behaviour, confirmed compromise — drive the
   95 → 62 → 8 style collapse of a previously-trusted entity.
-- **CODE refactored** to consume the ACDE (it sees, the ACDE decides).
+- **CODE refactored** to consume the ACDE (it sees, the ACDE decides). Renamed
+  **DIE** in v1.2.0.
 - **Tests**: 40 green, incl. ACDE, context, trust-evolution and decision-memory
   suites plus the Spring context smoke test.
 
@@ -71,7 +73,7 @@ intel ✅ · v1.1.1 Hardening ✅.
 - **Detection export**: `POST /api/v1/detections/dns` evaluates a domain and
   returns SIEM-ready artifacts — a **Sigma** rule (dns_query logsource, level
   mapped from the decision band) and a **YARA** rule embedding the domain and
-  the reasoning-chain claims. Bridges COGNESIS verdicts to real detection
+  the reasoning-chain claims. Bridges BAT security verdicts to real detection
   tooling.
 - **Live threat-intel ingestion**: `ThreatFeedIngestor` fetches a host-file
   style feed (abuse.ch ThreatFox/URLhaus format), flags IOCs in the DNS facts
@@ -86,7 +88,7 @@ intel ✅ · v1.1.1 Hardening ✅.
   registrar, subdomain/cert counts — with per-source timeouts, a TTL cache,
   and wholesale fallback to the in-memory seed when offline.
 - **ThreatIntel analyzer (16th)**: feed flags now enter the reasoning chain as
-  `CODE:THREAT_INTEL`; a single match exceeds the MOTIVE enrichment threshold.
+  `DIE:THREAT_INTEL`; a single match exceeds the MOTIVE enrichment threshold.
 - **DevOps**: GitHub Actions CI (Java 21, full suite + jar), multi-stage
   Dockerfile + `docker-compose.yml` (live feed + live DNS on by default).
 - **78 tests green**, incl. 7 new tests (mock-HTTP live facts, fallback &
@@ -128,7 +130,45 @@ intel ✅ · v1.1.1 Hardening ✅.
 - **96 tests green**, incl. 18 new (IOC store persistence, fail-closed posture,
   rate limiting, DoH failover, SSRF rejection, feed health).
 
-## 6. Later (framework growth)
+## 6. Done (v1.2.0 — BAT security)
+
+- **Rebranding**: COGNESIS → **BAT security**, tagline
+  "Engineering-first, evidence-driven." Package/class names, `COGNESIS_*`
+  environment variables and the `cognesis.*` config namespace stay unchanged
+  (branding only, no breaking changes).
+- **DNS Intelligence Engine (DIE)**: the Cognitive DNS Engine is renamed;
+  `CognitiveDnsEngine` remains as a `@Deprecated` alias extending the new
+  `DnsIntelligenceEngine` interface. Reasoning-chain claim prefixes move from
+  `CODE:` to `DIE:`.
+- **ACTG — Adaptive Cognitive Trust Graph** (the distinctive internal model):
+  a Security Knowledge Graph (`actg/`) linking USER, DEVICE, DOMAIN,
+  CERTIFICATE, IP and INCIDENT nodes via RESOLVES_TO / REQUESTED_BY /
+  SOURCE_FROM / ISSUED_FOR / ASSOCIATED_WITH / TARGET_OF edges. Nodes ratchet
+  to the high-water risk of their associations; edges strengthen by `+0.25` per
+  repeated observation (bounded `[1.0, 3.0]`); `neighborhoodRisk` skips
+  zero-risk neighbours. Domain→IP edges are recorded **before** the analyzers
+  run, so a first-touch domain that resolves to a known-bad IP inherits its
+  risk. `ActgAnalyzer` (17th) emits `EvidenceType.ACTG`; `DnsFacts` gained a
+  `resolvedIps` field (DoH A/AAAA extracted in the live repository).
+- **Decision Learning (LORE)**: feedback kinds `CONFIRMED_MALICIOUS` (+1) /
+  `FALSE_POSITIVE` (−1) / `CONFIRMED_BENIGN` (−0.5) with optional signal
+  strengths (default 0.75); weight update `ETA · gap · direction · s_avg`,
+  weights capped at 2.0, likelihood weight clamped to [0,1]; a bounded
+  calibration offset in [−0.5, +0.5] tracks systematic over/under-flagging.
+  `LoreFeedbackController` accepts `classification` + `signalStrengths` and
+  returns the learned calibration.
+- **Organization Profiles**: `profile/` ships `OrgProfile` + `ProfileEvaluationEngine`
+  with seeded hospital (tolerance 0.70 + block rule), bank (0.80 + two rules)
+  and university (1.20 + allow rule) defaults; unknown orgs fall back to the
+  DEFAULT profile. `PolicyRule` gained an optional `organizationId`;
+  `SynapseEngine` gained `evaluate(input, weights, band)` + `bandPolicy()`; the
+  ACDE applies org-scoped hard rules and scales decision bands by the org's risk
+  tolerance using `DnsResolutionRequest.context.organizationId`. Schema:
+  `organization_profile` table (Flyway `V5`).
+- **118 tests green**, incl. 22 new (ACTG graph + engine slice, LORE learning,
+  profile evaluation, org policy through the ACDE, DIE end-to-end).
+
+## 7. Later (framework growth)
 
 ### New evidence providers (drop-in, no core changes)
 - Email gateway (SPF/DKIM/DMARC verdicts → `EMAIL_REPUTATION`).
@@ -151,7 +191,7 @@ SYNAPSE and the reasoning-chain format are unchanged.
 - Admin UI to inspect trust, memory, weights, bands, and per-decision chains.
 - SOC playbook integration (SOAR outbound actions from `RecommendedAction`).
 
-## 7. Guiding principles for all future work
+## 8. Guiding principles for all future work
 
 1. Every new signal must map to a `[0,1]` strength with a confidence.
 2. Every new engine must contribute a named slice and a reasoning step.

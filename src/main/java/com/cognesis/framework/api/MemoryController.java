@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Memory endpoints: recall what COGNESIS remembers about an entity and feed it
+ * Memory endpoints: recall what BAT security remembers about an entity and feed it
  * new incidents to learn from.
  */
 @RestController

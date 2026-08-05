@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * The final, fully explainable outcome of a COGNESIS decision.
+ * The final, fully explainable outcome of a BAT security decision.
  * Produced by the decision orchestrator after fusing every reasoning engine.
  */
 public record DecisionResult(

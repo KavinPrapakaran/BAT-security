@@ -1,5 +1,6 @@
 package com.cognesis.framework.acde;
 
+import com.cognesis.framework.algorithm.DecisionBandPolicy;
 import com.cognesis.framework.algorithm.SynapseDecision;
 import com.cognesis.framework.algorithm.SynapseEngine;
 import com.cognesis.framework.algorithm.SynapseInput;
@@ -32,6 +33,7 @@ import com.cognesis.framework.policy.PolicyEvaluator;
 import com.cognesis.framework.policy.PolicyVerdict;
 import com.cognesis.framework.prediction.PredictionEngine;
 import com.cognesis.framework.prediction.PredictionResult;
+import com.cognesis.framework.profile.ProfileEvaluationEngine;
 import com.cognesis.framework.recommend.Recommendation;
 import com.cognesis.framework.recommend.RecommendationEngine;
 import com.cognesis.framework.trust.TrustAssessment;
@@ -46,7 +48,7 @@ import java.util.UUID;
 
 /**
  * ACDE - Adaptive Cognitive Decision Engine. This is the single decision-maker
- * of the COGNESIS framework: every module (DNS, Email, API, Endpoint, Cloud,
+ * of the BAT security framework: every module (DNS, Email, API, Endpoint, Cloud,
  * Identity, ...) feeds it evidence, and it alone decides.
  *
  * <p>It collects evidence from every engine, normalizes each contribution into
@@ -75,6 +77,7 @@ public class AcdeEngine {
     private final WeightStore weightStore;
     private final DecisionLogDao decisionLogDao;
     private final PolicyEvaluator policyEvaluator;
+    private final ProfileEvaluationEngine profileEngine;
 
     public AcdeEngine(List<EvidenceProvider> evidenceProviders,
                       EvidenceIngestor evidenceIngestor,
@@ -90,7 +93,7 @@ public class AcdeEngine {
                       DecisionLogDao decisionLogDao) {
         this(evidenceProviders, evidenceIngestor, trustEngine, memoryEngine, contextEngine,
                 predictionEngine, intentEngine, impactEngine, recommendationEngine, synapseEngine,
-                weightStore, decisionLogDao, null);
+                weightStore, decisionLogDao, null, null);
     }
 
     public AcdeEngine(List<EvidenceProvider> evidenceProviders,
@@ -106,6 +109,25 @@ public class AcdeEngine {
                       WeightStore weightStore,
                       DecisionLogDao decisionLogDao,
                       PolicyEvaluator policyEvaluator) {
+        this(evidenceProviders, evidenceIngestor, trustEngine, memoryEngine, contextEngine,
+                predictionEngine, intentEngine, impactEngine, recommendationEngine, synapseEngine,
+                weightStore, decisionLogDao, policyEvaluator, null);
+    }
+
+    public AcdeEngine(List<EvidenceProvider> evidenceProviders,
+                      EvidenceIngestor evidenceIngestor,
+                      TrustEngine trustEngine,
+                      MemoryEngine memoryEngine,
+                      ContextEngine contextEngine,
+                      PredictionEngine predictionEngine,
+                      IntentEngine intentEngine,
+                      ImpactEngine impactEngine,
+                      RecommendationEngine recommendationEngine,
+                      SynapseEngine synapseEngine,
+                      WeightStore weightStore,
+                      DecisionLogDao decisionLogDao,
+                      PolicyEvaluator policyEvaluator,
+                      ProfileEvaluationEngine profileEngine) {
         this.evidenceProviders = evidenceProviders != null ? List.copyOf(evidenceProviders) : List.of();
         this.evidenceIngestor = evidenceIngestor;
         this.trustEngine = trustEngine;
@@ -119,6 +141,7 @@ public class AcdeEngine {
         this.weightStore = weightStore;
         this.decisionLogDao = decisionLogDao;
         this.policyEvaluator = policyEvaluator;
+        this.profileEngine = profileEngine;
     }
 
     /** Full evaluation: evidence is gathered from all registered providers. */
@@ -137,6 +160,13 @@ public class AcdeEngine {
                                    List<ReasoningStep> prefixSteps) {
         if (policyEvaluator != null) {
             PolicyVerdict verdict = policyEvaluator.evaluate(request.entityId(), request.entityType());
+            if (verdict.decision() == Decision.BLOCK) {
+                return hardPolicyDecision(request, verdict);
+            }
+        }
+        if (profileEngine != null) {
+            PolicyVerdict verdict = profileEngine.evaluate(
+                    organizationOf(request), request.entityId(), request.entityType());
             if (verdict.decision() == Decision.BLOCK) {
                 return hardPolicyDecision(request, verdict);
             }
@@ -209,11 +239,20 @@ public class AcdeEngine {
                 context.contextWeight(),
                 trust.confidence(),
                 evidence.confidence());
-        SynapseDecision decision = synapseEngine.evaluate(input, weights);
+        SynapseDecision decision = synapseEngine.evaluate(input, weights, bandPolicyFor(request));
         steps.add(new ReasoningStep("SYNAPSE", "fused decision",
                 decision.riskScore(), decision.confidenceScore(),
                 "likelihood=" + String.format("%.2f", decision.likelihoodScore())
                         + " blended with impact=" + String.format("%.2f", impact.businessImpact())));
+
+        String orgId = organizationOf(request);
+        if (profileEngine != null && orgId != null && !orgId.isBlank()) {
+            double tolerance = profileEngine.toleranceFor(orgId);
+            steps.add(new ReasoningStep("PROFILE", "organization profile",
+                    Math.min(1.0, 2.0 - tolerance), 0.9,
+                    "org '" + orgId + "' risk tolerance " + String.format("%.2f", tolerance)
+                            + " rescaled the decision bands"));
+        }
 
         Recommendation recommendation = recommendationEngine.recommend(
                 decision.decision(), decision.riskScore(), decision.businessImpactScore(),
@@ -262,6 +301,18 @@ public class AcdeEngine {
     private static String stringMeta(DecisionRequest request, String key, String def) {
         Object v = request.context().get(key);
         return v == null ? def : String.valueOf(v);
+    }
+
+    private static String organizationOf(DecisionRequest request) {
+        return stringMeta(request, "organizationId", null);
+    }
+
+    private DecisionBandPolicy bandPolicyFor(DecisionRequest request) {
+        String orgId = organizationOf(request);
+        if (profileEngine == null || orgId == null || orgId.isBlank()) {
+            return synapseEngine.bandPolicy();
+        }
+        return profileEngine.scaledBandPolicy(orgId, synapseEngine.bandPolicy());
     }
 
     private static double doubleMeta(DecisionRequest request, String key, double def) {

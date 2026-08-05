@@ -1,4 +1,4 @@
-# COGNESIS — Testing
+# BAT security — Testing
 
 ## 1. Strategy
 
@@ -22,21 +22,27 @@
 | `MnemonicMemoryEngineTest` | Memory graph + activation | 5 tests: empty recall → salience 0.5; memorize→recall surfaces entity; 2-hop propagation; baseline deviation; severity→base weight |
 | `MnemonicDecisionMemoryTest` | Decision/outcome memory | 3 tests: `recordDecision` stores a DECISION node with the reasoning chain; `recordOutcome` closes the loop via OUTCOME_OF; relationship type inference |
 | `SituationalContextEngineTest` | CONTEXT environment | 4 tests: known labels map to baseline risk; unknown is neutral; prod raises weight; anonymised source raises risk |
-| `DnsAnalyzersTest` | 15 DNS analyzers | 8 tests: DGA flags machine label, passes readable word; homograph flags Cyrillic spoof, passes ASCII; typosquat catches near-miss; fast flux; age; DNSSEC; policy; registrar |
-| `CognitiveDnsEngineTest` | CODE end-to-end via ACDE | 4 tests: well-known domain → ALLOW; typosquat riskier than brand; hard policy override → BLOCK with risk/conf 1.0; reasoning chain present |
+| `DnsAnalyzersTest` | 17 DNS analyzers | 8 tests: DGA flags machine label, passes readable word; homograph flags Cyrillic spoof, passes ASCII; typosquat catches near-miss; fast flux; age; DNSSEC; policy; registrar |
+| `DnsIntelligenceEngineTest` | DIE end-to-end via ACDE | 4 tests: well-known domain → ALLOW; typosquat riskier than brand; hard policy override → BLOCK with risk/conf 1.0; reasoning chain present |
+| `SecurityKnowledgeGraphTest` | ACTG trust graph | 5 tests: entity/relation model; edge strengthening on repeat; high-water risk ratchet; neighborhood risk skips zero-risk neighbours; graph wiring |
+| `ActgEngineTest` | ACTG slice through DIE | 3 tests: first-touch domain inherits a dirty IP's risk; reasoning chain carries the ACTG step; neutral when no relationships exist |
+| `LoreLearningEngineTest` | LORE weight learning | 7 tests: malicious confirmation raises weights; false positive lowers them; benign confirmation nudges less; calibration bounds; weight caps; signal strengths optional |
+| `ProfileEvaluationEngineTest` | org profiles | 5 tests: seeded defaults (hospital/bank/university); tolerance scaling; org-scoped rules; unknown org → DEFAULT; invalid tolerance rejected |
+| `OrgPolicyAcdeTest` | org policy through ACDE | 2 tests: org-scoped block rule short-circuits to BLOCK; unrelated org rule not applied |
 | `AcdeEngineTest` | ACDE full pipeline | 1 test (Mockito): all engines invoked, ≥ 10 reasoning steps, decision persisted, reasoning path stored in memory |
 | `CognesisApplicationTests` | Spring wiring + H2 | 3 tests: context loads; DNS decision persisted to DB; ACDE runs through pipeline |
 | `DetectionRuleGeneratorTest` | Sigma + YARA export | 4 tests: well-formed Sigma (dns_query, level per band); severity mapping; well-formed YARA (domain + claims, risk score); bundle filenames |
 | `ThreatFeedIngestorTest` | abuse.ch-style feed ingestion | 5 tests: host-file parsing flags IOCs; comments/blanks ignored; flags accumulate; disabled feed skips network; unreachable feed swallowed |
 | `LiveDnsFactsRepositoryTest` | live DNS/RDAP/CT facts via mock HTTP | 7 tests: assembles facts from all three sources; wholesale fallback when every source is offline; partial failure still uses responding sources; feed flags survive the live merge; results cached (no second network round-trip); **secondary DoH resolver failover (Google-format response)**; **unsafe domain input rejected with no outbound call** |
-| `IocEscalationTest` | feed IOC → ACDE verdict | 2 tests: flagged domain strictly riskier + non-ALLOW; reasoning chain contains the `CODE:THREAT_INTEL` step |
+| `IocEscalationTest` | feed IOC → ACDE verdict | 2 tests: flagged domain strictly riskier + non-ALLOW; reasoning chain contains the `DIE:THREAT_INTEL` step |
 | `JdbcIocStoreTest` | persistent IOC store (H2) | 3 tests: flag counts survive a new store instance; unknown domain → zero flags; `first_seen` stable across reflags |
 | `IocPersistenceTest` | feed flags across repository instances | 2 tests: a feed-flagged IOC surfaces through a fresh repository sharing the store; unknown domain stays clean |
 | `RateLimitFilterTest` | sliding-window rate limiter | 5 tests: requests within window pass; over-window → 429 + `Retry-After: 60`; clients limited independently; disabled filter never limits; `/actuator/health` exempt |
 | `FailClosedTest` | security fail-closed posture | 3 tests: protected endpoints 403 with no configured keys; presented key still 403; `/actuator/metrics` locked too |
 | `FeedHealthIndicatorTest` | feed health | 3 tests: disabled feed UP; enabled-but-never-refreshed DOWN; fresh refresh UP with IOC count |
 
-**Total: 96 tests, 0 failures.** Line coverage 80.9%, branch 64.2% (JaCoCo).
+**Total: 118 tests, 0 failures.** Line coverage and branch coverage both clear
+the JaCoCo gate (line ≥ 70%, branch ≥ 55%).
 
 ## 3. Running
 

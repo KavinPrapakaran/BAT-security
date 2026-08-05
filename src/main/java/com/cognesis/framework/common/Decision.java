@@ -1,7 +1,7 @@
 package com.cognesis.framework.common;
 
 /**
- * The seven canonical security decisions emitted by the COGNESIS framework.
+ * The seven canonical security decisions emitted by the BAT security framework.
  * Ordered from least to most restrictive so that comparison and escalation
  * logic can rely on {@link #ordinal()}.
  *

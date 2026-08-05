@@ -1,4 +1,4 @@
-# COGNESIS — REST API
+# BAT security — REST API
 
 Base path: `/api/v1`. JSON everywhere. Actuator health at `/actuator/health`.
 
@@ -8,7 +8,7 @@ Spring Validation is active on request bodies (`jakarta.validation`).
 
 ## 1. `POST /api/v1/dns/evaluate`
 
-Evaluate a DNS resolution request through CODE.
+Evaluate a DNS resolution request through DIE.
 
 ```json
 {
@@ -35,7 +35,7 @@ Response (`DnsDecision`):
     "businessImpactScore": 0.81,
     "rationale": "policy: ... | evidence: typosquatting 0.88 ...",
     "reasoningChain": [
-      { "engine": "CODE:TYPO_SQUAT", "claim": "...", "score": 0.88, "confidence": 0.8 },
+      { "engine": "DIE:TYPO_SQUAT", "claim": "...", "score": 0.88, "confidence": 0.8 },
       { "engine": "FIDES", "claim": "trust 0.31 (conf 0.77)", "score": 0.31, "confidence": 0.77 }
     ],
     "decidedAt": "2026-08-01T..."
@@ -63,8 +63,9 @@ General-purpose decision for any entity type.
 ```
 
 Response: `DecisionResult` (same shape as `outcome` above), with a reasoning
-chain of ≥ 10 steps: OBSERVATORY, FIDES, MNEMONIC (salience), MNEMONIC
-(deviation), CONTEXT, MOTIVE, SEER, RESOLVE, SYNAPSE, PACT.
+chain of ≥ 10 steps: OBSERVATORY, ACTG (graph), FIDES, MNEMONIC (salience),
+MNEMONIC (deviation), CONTEXT, MOTIVE, SEER, RESOLVE, PROFILES (org risk
+tolerance, when `context.organizationId` is present), SYNAPSE, PACT.
 
 ## 3. Trust management
 
@@ -118,10 +119,10 @@ artifacts (Sigma YAML + YARA). Body is the same `DnsResolutionRequest` as
 
 ```json
 [
-  { "format": "sigma", "content": "title: COGNESIS - BLOCK ...\n...",
-    "filename": "cognesis_7f3c....yml" },
-  { "format": "yara", "content": "rule cogensis_high_risk_block { ... }",
-    "filename": "cognesis_7f3c....yar" }
+  { "format": "sigma", "content": "title: BAT security - BLOCK ...\n...",
+    "filename": "batsec_7f3c....yml" },
+  { "format": "yara", "content": "rule batsec_high_risk_block { ... }",
+    "filename": "batsec_7f3c....yar" }
 ]
 ```
 

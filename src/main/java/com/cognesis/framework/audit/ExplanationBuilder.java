@@ -8,7 +8,7 @@ import java.util.List;
 
 /**
  * AUDITOR - turns the numeric reasoning chain into a human-readable narrative.
- * This is what makes COGNESIS decisions defensible in an enterprise: every
+ * This is what makes BAT security decisions defensible in an enterprise: every
  * verdict can be replayed to an analyst, a regulator, or a board member in
  * plain language.
  */

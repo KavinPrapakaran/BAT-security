@@ -1,4 +1,4 @@
--- COGNESIS v2 — memory graph persistence
+-- BAT security v2 — memory graph persistence
 
 CREATE TABLE IF NOT EXISTS memory_node (
     node_id       UUID PRIMARY KEY,

@@ -5,7 +5,7 @@ import com.cognesis.framework.math.LogitOps;
 
 /**
  * SYNAPSE - SYNthesized Probabilistic Assessment of Network Security Evidence.
- * The original core decision algorithm of the COGNESIS framework.
+ * The original core decision algorithm of the BAT security framework.
  *
  * <h2>How it works</h2>
  * <pre>
@@ -42,11 +42,25 @@ public class SynapseEngine {
         this.bandPolicy = bandPolicy != null ? bandPolicy : DecisionBandPolicy.defaults();
     }
 
+    /** The band policy used when no org-specific policy is supplied. */
+    public DecisionBandPolicy bandPolicy() {
+        return bandPolicy;
+    }
+
     /**
      * Evaluate a single decision. This method is pure: it has no side effects
      * and can be unit-tested exhaustively.
      */
     public SynapseDecision evaluate(SynapseInput input, SynapseWeights weights) {
+        return evaluate(input, weights, bandPolicy);
+    }
+
+    /**
+     * Evaluate with a caller-supplied band policy (e.g. one scaled by an
+     * organization's risk tolerance).
+     */
+    public SynapseDecision evaluate(SynapseInput input, SynapseWeights weights,
+                                    DecisionBandPolicy band) {
         double[] strengths = {
                 input.evidenceStrength(),
                 input.memorySalience(),
@@ -80,7 +94,7 @@ public class SynapseEngine {
         double confidence = computeConfidence(input, likelihood);
         risk = LogitOps.clamp01(risk * (1.0 + 0.10 * (1.0 - LogitOps.clamp01(input.contextWeight()))));
 
-        var decision = bandPolicy.mapRisk(risk, confidence);
+        var decision = band.mapRisk(risk, confidence);
         return new SynapseDecision(risk, likelihood, confidence, impact, decision);
     }
 

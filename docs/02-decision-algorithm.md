@@ -3,9 +3,9 @@
 **Full name:** **SYN**thesized **A**ssessment of **P**robabilistic **S**ecurity
 **E**vidence.
 
-SYNAPSE is the heart of COGNESIS. It fuses the evidence slices produced by the
-other engines into a single calibrated risk score, maps it to a decision band,
-and emits a recommended action. Everything below is implemented in
+SYNAPSE is the heart of BAT security. It fuses the evidence slices produced by
+the other engines into a single calibrated risk score, maps it to a decision
+band, and emits a recommended action. Everything below is implemented in
 `algorithm/SynapseEngine` and `math/LogitOps`.
 
 ---
@@ -160,16 +160,25 @@ function decide(input: SynapseInput, weights: SynapseWeights, bands: DecisionBan
 
 ## 8. Learning (Lore) hooks
 
-`LoreLearningEngine` adjusts weights from outcomes:
+`LoreLearningEngine` adjusts weights from feedback outcomes:
 
 ```
-Δw_k = α · c_k · (target_k − S_k)     clamped to [w_min, w_max]
+gap       = |y − 0.5|                       (how decisive the realized risk was)
+direction = +1.0  CONFIRMED_MALICIOUS
+            −1.0  FALSE_POSITIVE
+            −0.5  CONFIRMED_BENIGN
+s_avg     = mean of the signal strengths that fired (0.75 if not provided)
+
+Δw_k      = ETA · gap · direction · s_avg       ETA = 0.02
+w_k       <- clamp(w_k + Δw_k, 0, 2.0)
+w_likelihood <- clamp(w_likelihood + 2·Δw_k, 0, 1)
 ```
 
-where `target_k` is the outcome-derived target for slice k (e.g. if a decision
-was wrong because evidence was overweighted, its weight decays). Baselines used
-by `S_D` are updated via Welford's algorithm (mean, M2, variance) — see
-`docs/04-memory-engine.md`.
+A calibration offset is tracked alongside, bounded to `[−0.5, +0.5]`: repeated
+false positives push it negative, missed detections push it positive, and
+correct verdicts barely move it (half step). All updates are bounded and fully
+readable — LORE learns but never goes dark. Baselines used by `S_D` are updated
+via Welford's algorithm (mean, M2, variance) — see `docs/04-memory-engine.md`.
 
 ## 9. Design notes / why this is novel
 

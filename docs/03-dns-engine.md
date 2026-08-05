@@ -1,17 +1,20 @@
-# CODE — the Cognitive DNS Engine
+# DIE — the DNS Intelligence Engine
 
-**Full name:** **C**ognitive **D**NS **E**ngine.
+**Full name:** **D**NS **I**ntelligence **E**ngine.
 
-CODE is the flagship module of COGNESIS: a DNS-resolution decision engine that
+DIE is the flagship module of BAT security: a DNS-resolution decision engine that
 turns a single DNS query into a calibrated, explainable decision the same way a
 domain-reputation analyst would — by reasoning over *many* independent views of
 the requested domain before answering.
 
 Implemented in `dns/*`:
 
-- `CognitiveDnsEngineImpl` — the ACDE-facing engine: it collects DNS evidence
-  fragments and asks the **ACDE** (`acde/AcdeEngine`) to decide.
-- `DnsSignalAnalyzer` (interface) + **16 analyzers** in `dns/analyzer/`.
+- `DnsIntelligenceEngineImpl` — the ACDE-facing engine: it collects DNS evidence
+  fragments, records the domain→IP resolution into the ACTG graph first (so
+  first-touch inheritance works), and asks the **ACDE** (`acde/AcdeEngine`) to
+  decide. (`CognitiveDnsEngine` is kept as a deprecated alias for
+  compatibility.)
+- `DnsSignalAnalyzer` (interface) + **17 analyzers** in `dns/analyzer/`.
 - `DnsFacts` / `DnsFactsRepository` and `DnsSignal`.
 - `LiveDnsFactsRepository` — real-world facts from DNS-over-HTTPS (DoH,
   primary + secondary resolver), RDAP/WHOIS and certificate-transparency
@@ -26,22 +29,23 @@ Implemented in `dns/*`:
 For each resolution request `(domain, clientId, clientIp)`:
 
 ```
- 1  facts snapshot      ← DnsFactsRepository (whois, certs, history, policies...)
- 2  analyzer sweep      ← all enabled DnsSignalAnalyzers produce DnsSignal[]
- 3  policy override     ← hard rules checked FIRST
- 4  intent enrichment   ← MotiveIntentEngine over signals with strength ≥ 0.4
- 5  trust slice         ← FidesTrustEngine (dynamic reputation)
- 6  memory slice        ← MnemonicMemoryEngine (similar past domains)
- 7  prediction slice    ← SeerPredictionEngine (trend)
- 8  deviation slice     ← behaviour baselines (Welford) for this domain
- 9  synapse fusion      ← SynapseEngine (likelihood × impact blend)
-10  pact actions        ← PactRecommendationEngine
-11  reasoning chain     ← ≥ 10 steps (CODE:* senses, FIDES, MNEMONIC, SEER,
-                          MOTIVE, RESOLVE, SYNAPSE, PACT)
-12  persist             ← decision_log, trust events (see docs/07-database.md)
+ 1  graph record        ← ACTG: domain → IP edges recorded BEFORE analysis
+ 2  facts snapshot      ← DnsFactsRepository (whois, certs, history, policies...)
+ 3  analyzer sweep      ← all enabled DnsSignalAnalyzers produce DnsSignal[]
+ 4  policy override     ← hard rules checked FIRST
+ 5  intent enrichment   ← MotiveIntentEngine over signals with strength ≥ 0.4
+ 6  trust slice         ← FidesTrustEngine (dynamic reputation)
+ 7  memory slice        ← MnemonicMemoryEngine (similar past domains)
+ 8  prediction slice    ← SeerPredictionEngine (trend)
+ 9  deviation slice     ← behaviour baselines (Welford) for this domain
+10  synapse fusion      ← SynapseEngine (likelihood × impact blend)
+11  pact actions        ← PactRecommendationEngine
+12  reasoning chain     ← ≥ 10 steps (DIE:* senses, ACTG, FIDES, MNEMONIC, SEER,
+                          MOTIVE, RESOLVE, PROFILES, SYNAPSE, PACT)
+13  persist             ← decision_log, trust events (see docs/07-database.md)
 ```
 
-## 2. The 16 analyzers
+## 2. The 17 analyzers
 
 Each analyzer returns a `DnsSignal(evidenceType, strength, confidence,
 explanation, provenance)`.
@@ -64,6 +68,7 @@ explanation, provenance)`.
 | 14 | UserBehaviour | `DNS_USER_BEHAV` | does this user usually query this? | baseline deviation |
 | 15 | NetworkBehaviour | `DNS_NET_BEHAV` | does this network usually resolve this? | baseline deviation |
 | 16 | ThreatIntel | `THREAT_INTEL` | matches an IOC in the threat-intel feed | feed flag count |
+| 17 | ActgAnalyzer | `ACTG` | relationship risk from the trust graph | neighbor association |
 
 ### 2.3 Threat-intel feed (analyzer 16)
 
@@ -79,10 +84,25 @@ else:                       strength 0.1, conf 0.9 (neutral)
 A single flag already lands above the MOTIVE intent-enrichment threshold
 (`strength ≥ 0.4`), so known-bad domains escalate through the normal pipeline.
 
+### 2.4 ACTG graph slice (analyzer 17)
+
+`ActgAnalyzer` queries the **Adaptive Cognitive Trust Graph**: nodes ratchet to
+the high-water risk mark of their associations, edges strengthen by `+0.25` per
+repeated observation (bounded `[1.0, 3.0]`), and `neighborhoodRisk` skips
+zero-risk neighbours so a new user or IP can never dilute a dirty IP's signal.
+Because the engine records the domain→IP edge *before* the analyzers run, a
+never-seen domain resolving to a known-bad IP inherits its risk on first touch:
+
+```
+if domain has ACTG edges:  strength = neighborhoodRisk (carried from the graph)
+                           confidence = min(0.9, 0.45 + edges·0.1)
+else:                      strength 0.1, conf 0.9 (neutral, no relationships yet)
+```
+
 ### 2.1 DGA scoring (DgaAnalyzer)
 
 A pure entropy test is a poor DGA detector (long readable words have high
-entropy). CODE uses a **pronounceability-aware** score:
+entropy). DIE uses a **pronounceability-aware** score:
 
 ```
 entropy  = Shannon entropy over label chars (bits/char)
@@ -101,7 +121,7 @@ score ~0.47; machine-generated labels like `tkqzvbxkadnpqws` (run 8, vowel ratio
 ### 2.2 Homograph scoring
 
 Any non-ASCII character in a label is suspicious but a single one is easy to
-dilute; CODE floors the strength:
+dilute; DIE floors the strength:
 
 ```
 if nonAscii > 0:  strength = min(1, 0.55 + fraction·0.40)
@@ -111,7 +131,7 @@ so a one-character Cyrillic swap (`amаzon.com`) still flags at ≥ 0.55.
 
 ## 3. Policy override semantics
 
-**Hard policy wins.** If a policy rule matches (e.g. block-list), CODE
+**Hard policy wins.** If a policy rule matches (e.g. block-list), DIE
 short-circuits before fusion:
 
 ```
@@ -141,15 +161,17 @@ The dominant intent feeds the SYNAPSE intent slice.
 includes, in order:
 
 ```
-1  CODE:<analyzer>     (each strong signal, top contributors)
-2  CODE:SENSE          (aggregate evidence slice)
-3  FIDES               (trust)
-4  MNEMONIC            (memory salience)
-5  SEER                (prediction)
-6  MOTIVE              (intent)
-7  RESOLVE             (impact)
-8  SYNAPSE             (fused risk + band)
-9  PACT                (recommended action)
+1  DIE:<analyzer>     (each strong signal, top contributors)
+2  DIE:SENSE          (aggregate evidence slice)
+3  ACTG               (graph relationship slice, when present)
+4  FIDES              (trust)
+5  MNEMONIC           (memory salience)
+6  SEER               (prediction)
+7  MOTIVE             (intent)
+8  RESOLVE            (impact)
+9  PROFILES           (org risk tolerance, when an org context is present)
+10 SYNAPSE            (fused risk + band)
+11 PACT               (recommended action)
 ```
 
 ## 6. Facts model
@@ -199,7 +221,7 @@ See `docs/06-api.md` for full payloads.
 DNS is the first network touch of almost every attack — phishing, C2, DGA,
 exfiltration, typosquatting. A *decision* at resolution time (allow / monitor /
 warn / challenge / escalate / isolate / block) is the cheapest, least-disruptive
-place to intervene. CODE is designed to
+place to intervene. DIE is designed to
 run inline in a DNS proxy/resolver or as a pre-resolution check API.
 
 ## 9. Extending
@@ -207,7 +229,7 @@ run inline in a DNS proxy/resolver or as a pre-resolution check API.
 New evidence sources are one class each:
 
 1. Implement `DnsSignalAnalyzer.analyze(request, facts) → DnsSignal`.
-2. Register it as a Spring bean (auto-picked by `CognitiveDnsEngineImpl`).
+2. Register it as a Spring bean (auto-picked by `DnsIntelligenceEngineImpl`).
 3. (Optional) add its intent mapping in `MotiveIntentEngine`.
 
 The engine core is untouched — the framework guarantee from

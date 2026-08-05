@@ -1,4 +1,4 @@
--- COGNESIS v1 — baseline schema (H2 + PostgreSQL compatible)
+-- BAT security v1 — baseline schema (H2 + PostgreSQL compatible)
 
 CREATE TABLE IF NOT EXISTS signal_observation (
     id              UUID PRIMARY KEY,

@@ -10,12 +10,12 @@ public record DetectionRule(String format, String content, String filename) {
     public static DetectionRule sigma(DecisionResult result) {
         return new DetectionRule("sigma",
                 DetectionRuleGenerator.sigmaRule(result),
-                "cognesis_" + result.decisionId() + ".yml");
+                "batsec_" + result.decisionId() + ".yml");
     }
 
     public static DetectionRule yara(DecisionResult result) {
         return new DetectionRule("yara",
                 DetectionRuleGenerator.yaraRule(result),
-                "cognesis_" + result.decisionId() + ".yar");
+                "batsec_" + result.decisionId() + ".yar");
     }
 }

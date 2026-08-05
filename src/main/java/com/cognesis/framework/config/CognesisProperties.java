@@ -6,7 +6,7 @@ import com.cognesis.framework.trust.TrustProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Externalized configuration for the COGNESIS framework, bound from
+ * Externalized configuration for the BAT security framework, bound from
  * application.yml under {@code cognesis.*}.
  */
 @ConfigurationProperties(prefix = "cognesis")

@@ -1,10 +1,10 @@
-# COGNESIS — Database
+# BAT security — Database
 
 Two schema sources ship in `src/main/resources/db/`:
 
 - **`schema-h2.sql`** — dev/test, run by Spring Boot on the in-memory H2
   database configured with `MODE=PostgreSQL`. Mirrors the production schema.
-- **Flyway migrations (`db/migration/V1..V4`)** — authoritative production DDL
+- **Flyway migrations (`db/migration/V1..V5`)** — authoritative production DDL
   (TIMESTAMPTZ, JSONB, BIGSERIAL, pgcrypto UUIDs, indexes); applied to
   PostgreSQL under the `postgres` profile.
 
@@ -67,7 +67,24 @@ averages criticality+sensitivity of the assets linked to a decision.
 
 ### outcome_feedback (Lore)
 Closed-loop learning ledger: `decision_id` → `realized_risk`, `was_correct`,
-notes. Feeds weight updates in `LoreLearningEngine`.
+`kind`, `signal_strengths`, notes. Feeds weight updates in `LoreLearningEngine`.
+
+### organization_profile (Profiles)
+Org risk profiles consumed by `ProfileEvaluationEngine`:
+
+| Column | Notes |
+|---|---|
+| `organization_id` | TEXT PRIMARY KEY |
+| `name` | display name |
+| `risk_tolerance` | (0,2] multiplier on the decision-band thresholds |
+| `enabled` | only enabled profiles apply |
+
+Seeded (Flyway `V5__organization_profiles.sql`): `hospital` (tolerance 0.70 +
+block rule), `bank` (tolerance 0.80 + two rules), `university` (tolerance 1.20 +
+allow rule). Unknown orgs fall back to the DEFAULT profile (tolerance 1.0, no
+rules). `policy_rule.organization_id` (nullable) scopes a rule to one org;
+`InMemoryPolicyEvaluator` and the production evaluator skip org-scoped rules
+when the request has no org context.
 
 ### ioc_flag (IOC store)
 Persistent threat-intel flags from the feed (Flyway `V4__ioc_flags.sql`):
@@ -91,6 +108,8 @@ Both schemas seed a baseline:
   allow corporate zone).
 - 3 assets (billing portal WEB 0.95/0.90, corporate mail API 0.85/0.80,
   CI build farm SERVICE 0.60/0.30).
+- 3 organization profiles (hospital / bank / university) in the `postgres`
+  profile via `V5`; the H2 schema seeds the same three idempotently.
 - The H2 variant inserts idempotently (`WHERE NOT EXISTS`) so repeated context
   starts are safe.
 
@@ -100,7 +119,7 @@ Both schemas seed a baseline:
 |---|---|---|
 | Driver | H2 (`MODE=PostgreSQL`) | PostgreSQL 14+ |
 | Data | ephemeral in-memory | persistent |
-| Schema load | `spring.sql.init` on startup | Flyway migrations (`V1..V4`) |
+| Schema load | `spring.sql.init` on startup | Flyway migrations (`V1..V5`) |
 | Types | TEXT / BIGINT IDENTITY / UUID | TIMESTAMPTZ / JSONB / BIGSERIAL |
 
 To switch profiles:

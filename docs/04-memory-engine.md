@@ -2,11 +2,13 @@
 
 **Full name:** **MNEMO**n**IC** knowledge engine.
 
-MNEMONIC gives COGNESIS *episodic* memory: "have we seen something like this
+MNEMONIC gives BAT security *episodic* memory: "have we seen something like this
 before, and what happened to it?" It is a lightweight in-memory **knowledge
 graph** of entities and relations, recalled via **spreading activation** — the
 same retrieval metaphor used in cognitive models (Anderson's ACT-R), adapted to
-cyber entities.
+cyber entities. (It is distinct from — and complementary to — the **ACTG**
+trust graph: MNEMONIC recalls *what happened before*; ACTG scores *who is
+connected to whom*.)
 
 Implemented in `memory/`:
 

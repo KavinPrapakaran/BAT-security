@@ -1,8 +1,8 @@
 package com.cognesis.framework.api;
 
 import com.cognesis.framework.detection.DetectionRule;
-import com.cognesis.framework.dns.CognitiveDnsEngine;
 import com.cognesis.framework.dns.DnsDecision;
+import com.cognesis.framework.dns.DnsIntelligenceEngine;
 import com.cognesis.framework.dns.DnsResolutionRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -22,9 +22,9 @@ import java.util.List;
 @RequestMapping("/api/v1/detections")
 public class DetectionController {
 
-    private final CognitiveDnsEngine engine;
+    private final DnsIntelligenceEngine engine;
 
-    public DetectionController(CognitiveDnsEngine engine) {
+    public DetectionController(DnsIntelligenceEngine engine) {
         this.engine = engine;
     }
 

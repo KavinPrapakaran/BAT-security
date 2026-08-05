@@ -13,7 +13,7 @@ import java.util.Locale;
 /**
  * Ingests known-bad domains from an external threat-intel feed (abuse.ch
  * ThreatFox/URLhaus style) and flags them in the DNS facts repository so live
- * IOCs influence future COGNESIS verdicts. Disabled unless a feed URL is
+ * IOCs influence future BAT security verdicts. Disabled unless a feed URL is
  * configured; never blocks startup when offline.
  */
 public class ThreatFeedIngestor {

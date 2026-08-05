@@ -34,9 +34,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class CognitiveDnsEngineTest {
+class DnsIntelligenceEngineTest {
 
-    private CognitiveDnsEngine engine;
+    private DnsIntelligenceEngine engine;
 
     @BeforeEach
     void setUp() {
@@ -62,7 +62,7 @@ class CognitiveDnsEngineTest {
                 new DecisionLogDao() {
                 }, policy);
 
-        engine = new CognitiveDnsEngineImpl(
+        engine = new DnsIntelligenceEngineImpl(
                 new InMemoryDnsFactsRepository(),
                 List.of(new DomainAgeAnalyzer()),
                 acde);
@@ -97,7 +97,7 @@ class CognitiveDnsEngineTest {
         DnsDecision decision = engine.evaluate(DnsResolutionRequest.of("paypa1.com", "alice", "10.1.1.5"));
         List<String> engines = decision.outcome().reasoningChain().stream()
                 .map(ReasoningStep::engine).toList();
-        assertTrue(engines.stream().anyMatch(e -> e.startsWith("CODE:")), "must include DNS senses");
+        assertTrue(engines.stream().anyMatch(e -> e.startsWith("DIE:")), "must include DNS senses");
         assertTrue(engines.contains("FIDES"), "must include trust reasoning");
         assertTrue(engines.contains("CONTEXT"), "must include environment reasoning");
         assertTrue(engines.contains("SYNAPSE"), "must include fused decision");

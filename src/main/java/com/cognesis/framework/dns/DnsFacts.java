@@ -21,6 +21,7 @@ import java.util.List;
  * @param certificateCount    certificates seen in CT logs
  * @param certificateInCtLogs whether certs are in public CT logs
  * @param maliciousFlagCount  times this domain was previously flagged
+ * @param resolvedIps         A/AAAA addresses returned by the resolver
  */
 public record DnsFacts(
         String domain,
@@ -34,10 +35,12 @@ public record DnsFacts(
         Instant certificateIssuedAt,
         int certificateCount,
         boolean certificateInCtLogs,
-        int maliciousFlagCount) {
+        int maliciousFlagCount,
+        List<String> resolvedIps) {
 
     public DnsFacts {
         ipRecordChurn = Math.max(0.0, Math.min(1.0, ipRecordChurn));
         subdomains = subdomains != null ? List.copyOf(subdomains) : List.of();
+        resolvedIps = resolvedIps != null ? List.copyOf(resolvedIps) : List.of();
     }
 }

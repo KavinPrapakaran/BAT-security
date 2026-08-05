@@ -18,6 +18,7 @@ public enum EvidenceType {
     DNS_HOMOGRAPH,
     DNS_SUBDOMAIN_BEHAVIOUR,
     DNS_HISTORICAL_TRUST,
+    ACTG,
     // Cross-cutting families
     POLICY,
     THREAT_MEMORY,

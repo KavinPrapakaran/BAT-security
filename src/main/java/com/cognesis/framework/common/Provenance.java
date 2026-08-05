@@ -16,5 +16,6 @@ public enum Provenance {
     POLICY_ANNOTATION,
     ANALYST_INPUT,
     TELEMETRY,
-    CONFIGURATION
+    CONFIGURATION,
+    GRAPH
 }

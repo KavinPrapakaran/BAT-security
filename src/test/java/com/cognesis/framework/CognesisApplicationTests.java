@@ -2,8 +2,8 @@ package com.cognesis.framework;
 
 import com.cognesis.framework.acde.AcdeEngine;
 import com.cognesis.framework.acde.DecisionRequest;
-import com.cognesis.framework.dns.CognitiveDnsEngine;
 import com.cognesis.framework.dns.DnsDecision;
+import com.cognesis.framework.dns.DnsIntelligenceEngine;
 import com.cognesis.framework.dns.DnsResolutionRequest;
 import com.cognesis.framework.persistence.JdbcDecisionLogDao;
 import com.cognesis.framework.persistence.JdbcTrustProfileStore;
@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CognesisApplicationTests {
 
     @Autowired
-    private CognitiveDnsEngine dnsEngine;
+    private DnsIntelligenceEngine dnsEngine;
 
     @Autowired
     private AcdeEngine acde;

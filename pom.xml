@@ -14,8 +14,8 @@
     <groupId>com.cognesis</groupId>
     <artifactId>cognesis-framework</artifactId>
     <version>1.0.0-SNAPSHOT</version>
-    <name>COGNESIS Cognitive Security Decision Framework</name>
-    <description>An analyst-inspired, modular cybersecurity decision framework: SYNAPSE decision algorithm, ACDE decision core, Fides trust engine, Mnemonic memory engine, and the Cognitive DNS Engine (CODE).</description>
+    <name>BAT security v1.2.0</name>
+    <description>Engineering-first, evidence-driven. A modular cybersecurity decision framework: ACTG adaptive cognitive trust graph, SYNAPSE decision algorithm, ACDE decision core, DIE DNS intelligence engine, Fides trust engine, Mnemonic memory engine, LORE decision learning, and organization profiles.</description>
 
     <properties>
         <java.version>21</java.version>

@@ -1,4 +1,4 @@
-# COGNESIS — End-to-end demo (live sources)
+# BAT security — End-to-end demo (live sources)
 
 This walkthrough shows the framework running against **real** data: a live
 threat-intel feed (abuse.ch URLhaus), real DNS-over-HTTPS, RDAP/WHOIS and
@@ -59,9 +59,9 @@ curl -s http://localhost:8080/api/v1/dns/evaluate \
     "riskScore": 0.21,
     "confidenceScore": 0.86,
     "reasoningChain": [
-      { "engine": "CODE:DOMAIN_AGE",  "claim": "registered 1997-09-15 (live RDAP, age ~10500d)" },
-      { "engine": "CODE:DNSSEC",      "claim": "AD=1 / delegationSigned=true (live)" },
-      { "engine": "CODE:THREAT_INTEL","claim": "no IOC match in feed", "score": 0.1 },
+      { "engine": "DIE:DOMAIN_AGE",  "claim": "registered 1997-09-15 (live RDAP, age ~10500d)" },
+      { "engine": "DIE:DNSSEC",      "claim": "AD=1 / delegationSigned=true (live)" },
+      { "engine": "DIE:THREAT_INTEL","claim": "no IOC match in feed", "score": 0.1 },
       { "engine": "FIDES", "...", "...", "..." }
     ]
   },
@@ -90,15 +90,15 @@ evidence), with the threat-intel step near the top of the chain:
   "outcome": {
     "riskScore": 0.92,
     "reasoningChain": [
-      { "engine": "CODE:THREAT_INTEL", "claim": "flagged 1x by abuse.ch feed", "score": 0.75, "confidence": 0.85 },
-      { "engine": "CODE:DOMAIN_AGE",   "claim": "registered 12 days ago (live RDAP)", "score": 0.6, "confidence": 0.8 }
+      { "engine": "DIE:THREAT_INTEL", "claim": "flagged 1x by abuse.ch feed", "score": 0.75, "confidence": 0.85 },
+      { "engine": "DIE:DOMAIN_AGE",   "claim": "registered 12 days ago (live RDAP)", "score": 0.6, "confidence": 0.8 }
     ]
   },
   "verdictExplanation": "BLOCK: <urlhaus-ioc> scored 0.92 ..."
 }
 ```
 
-The `CODE:THREAT_INTEL` step is the *new* 16th analyzer: a single feed flag
+The `DIE:THREAT_INTEL` step is the *new* 16th analyzer: a single feed flag
 already exceeds the MOTIVE enrichment threshold, so the intent slice and the
 final band both escalate.
 
@@ -125,7 +125,7 @@ curl -s http://localhost:8080/api/v1/detections/dns \
 Example Sigma rule emitted for a BLOCK verdict:
 
 ```yaml
-title: COGNESIS BLOCK for <urlhaus-ioc>
+title: BAT security BLOCK for <urlhaus-ioc>
 logsource:
   category: dns_query
 detection:
@@ -135,7 +135,7 @@ detection:
 level: critical
 ```
 
-Import the `cognesis_<uuid>.yml` file into any Sigma-compatible SIEM/EDR
+Import the `batsec_<uuid>.yml` file into any Sigma-compatible SIEM/EDR
 (Wazuh, Elastic, Splunk via sigma2es, THOR, ...).
 
 > **Screenshot placeholder** — paste a screenshot of the imported Sigma rule
@@ -149,7 +149,7 @@ Everything degrades gracefully if the network or a source is unavailable:
 | Setting | Off effect |
 |---|---|
 | `COGNESIS_DNS_LIVE_ENABLED=false` | facts fall back to in-memory seed data; engine still works |
-| `COGNESIS_FEED_ENABLED=false` | no feed fetch; `CODE:THREAT_INTEL` stays neutral |
+| `COGNESIS_FEED_ENABLED=false` | no feed fetch; `DIE:THREAT_INTEL` stays neutral |
 | no network at all | every live source times out; wholesale fallback, verdict still produced |
 
 Tests cover all of these paths (`LiveDnsFactsRepositoryTest`,

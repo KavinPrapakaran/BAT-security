@@ -132,6 +132,8 @@ public class LiveDnsFactsRepository implements DnsFactsRepository {
             dnssec = dohDnssec(doh);
         }
 
+        List<String> resolvedIps = dohResolvedIps(doh);
+
         long ageDays = rdapAgeDays(rdap, domain);
         if (ageDays < 0) {
             ageDays = 0;
@@ -155,7 +157,35 @@ public class LiveDnsFactsRepository implements DnsFactsRepository {
                 certIssued,
                 certificateCount,
                 certificateCount > 0,
-                0);
+                0,
+                resolvedIps);
+    }
+
+    /**
+     * Extracts A/AAAA answers from the DoH response. Used to link domains to
+     * the IPs they resolved to, which feeds the security knowledge graph.
+     */
+    private static List<String> dohResolvedIps(JsonNode doh) {
+        if (doh == null) {
+            return List.of();
+        }
+        JsonNode answers = doh.path("Answer");
+        if (!answers.isArray()) {
+            return List.of();
+        }
+        Set<String> ips = new HashSet<>();
+        for (JsonNode answer : answers) {
+            String data = answer.path("data").asText("");
+            if (data == null || data.isBlank()) {
+                continue;
+            }
+            if (data.indexOf(':') < 0 && data.matches("\\d{1,3}(\\.\\d{1,3}){3}")) {
+                ips.add(data);
+            } else if (data.indexOf(':') >= 0 && data.indexOf('.') < 0 && !data.startsWith(".")) {
+                ips.add(data);
+            }
+        }
+        return new ArrayList<>(ips);
     }
 
     /**
@@ -185,14 +215,15 @@ public class LiveDnsFactsRepository implements DnsFactsRepository {
                 base.certificateIssuedAt(),
                 base.certificateCount(),
                 base.certificateInCtLogs(),
-                fromFallback.maliciousFlagCount());
+                fromFallback.maliciousFlagCount(),
+                base.resolvedIps());
     }
 
     private static DnsFacts withDomain(DnsFacts facts, String domain) {
         return new DnsFacts(domain, facts.ageDays(), facts.dnssecValid(), facts.registrarCount(),
                 facts.nameServerChanges(), facts.ipRecordChurn(), facts.subdomains(), facts.whoisPrivacy(),
                 facts.certificateIssuedAt(), facts.certificateCount(), facts.certificateInCtLogs(),
-                facts.maliciousFlagCount());
+                facts.maliciousFlagCount(), facts.resolvedIps());
     }
 
     private JsonNode fetchJson(String url) {
